@@ -1,0 +1,87 @@
+name: portfolio-development
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: Conteneurisation/Dockerfile.frontend
+    working_dir: /workspace/FrontEnd
+    command: dotnet watch run --project FrontEnd.csproj --no-launch-profile --urls http://0.0.0.0:5200
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+    ports:
+      - "${FRONTEND_PORT:-5200}:5200"
+    volumes:
+      - ../FrontEnd:/workspace/FrontEnd
+      - frontend_bin:/workspace/FrontEnd/bin
+      - frontend_obj:/workspace/FrontEnd/obj
+    depends_on:
+      backend:
+        condition: service_started
+    init: true
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Conteneurisation/Dockerfile.backend
+    working_dir: /workspace/BackEnd
+    command: dotnet watch run --project BackEnd.csproj --no-launch-profile --urls http://0.0.0.0:5097
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+    ports:
+      - "${BACKEND_PORT:-5097}:5097"
+    volumes:
+      - ../BackEnd:/workspace/BackEnd
+      - backend_bin:/workspace/BackEnd/bin
+      - backend_obj:/workspace/BackEnd/obj
+    depends_on:
+      mysql:
+        condition: service_healthy
+    init: true
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Définissez MYSQL_ROOT_PASSWORD dans le fichier .env}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-portfolio_dev}"
+      MYSQL_USER: "${MYSQL_USER:-portfolio_dev}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD dans le fichier .env}"
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:5.2-apache
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: "${MYSQL_USER:-portfolio_dev}"
+      PMA_PASSWORD: "${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD dans le fichier .env}"
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  frontend_bin:
+  frontend_obj:
+  backend_bin:
+  backend_obj:

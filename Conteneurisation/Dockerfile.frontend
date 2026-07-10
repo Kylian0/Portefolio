@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /workspace/FrontEnd
+
+COPY FrontEnd/FrontEnd.csproj ./
+RUN dotnet restore FrontEnd.csproj
+
+COPY FrontEnd/ ./
+
+EXPOSE 5200
+
+CMD ["dotnet", "watch", "run", "--project", "FrontEnd.csproj", "--no-launch-profile", "--urls", "http://0.0.0.0:5200"]

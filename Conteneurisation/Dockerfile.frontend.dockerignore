@@ -1,0 +1,9 @@
+.git
+.github
+.vs
+**/.vs
+**/bin
+**/obj
+**/*.user
+BackEnd
+Conteneurisation/.env
