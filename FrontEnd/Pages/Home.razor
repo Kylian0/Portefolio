@@ -1,7 +1,140 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Accueil | Portfolio</PageTitle>
 
-<h1>Hello, world!</h1>
+<main class="home-page">
+    <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__content">
+            <p class="home-eyebrow">Bonjour, je suis Kylian</p>
+            <h1 id="hero-title">Passionné d'informatique, je donne vie à mes idées par le code.</h1>
+            <p class="hero__description">
+                J'ai 21 ans et je développe des applications web, des applications mobiles et des jeux vidéo.
+                J'aime concevoir, résoudre des problèmes et découvrir continuellement de nouvelles technologies.
+            </p>
 
-Welcome to your new app.
+            <div class="hero__actions">
+                <a class="button button--primary" href="/projects">Découvrir mes projets</a>
+                <a class="button button--secondary" href="/contact">Discutons ensemble</a>
+            </div>
+
+            <ul class="hero__highlights" aria-label="Informations principales">
+                <li><strong>21 ans</strong><span>passionné depuis toujours</span></li>
+                <li><strong>3</strong><span>domaines de développement</span></li>
+                <li><strong>100 %</strong><span>curieux et impliqué</span></li>
+            </ul>
+        </div>
+
+        <div class="hero__visual" aria-hidden="true">
+            <div class="hero__code-window">
+                <span class="hero__window-bar"></span>
+                <code>
+                    <span>public</span> Developer Me =&gt; <span>new</span>()<br />
+                    {<br />
+                    &nbsp;&nbsp;Curious = <strong>true</strong>,<br />
+                    &nbsp;&nbsp;Focused = <strong>true</strong><br />
+                    };
+                </code>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section about-section" aria-labelledby="about-title">
+        <div class="section-heading">
+            <p class="home-eyebrow">À propos</p>
+            <h2 id="about-title">Une passion devenue un projet professionnel</h2>
+        </div>
+        <div class="about-section__content">
+            <p>
+                Passionné par l'informatique et les jeux vidéo depuis mon plus jeune âge, j'ai naturellement eu
+                envie de comprendre comment les logiciels et les univers interactifs étaient créés. Cette curiosité
+                m'a conduit vers le développement pour transformer ce qui m'anime depuis toujours en métier.
+            </p>
+            <p>
+                Aujourd'hui, j'explore plusieurs facettes du métier à travers le web, le mobile et le jeu vidéo.
+                Chaque projet est pour moi une occasion d'apprendre, de résoudre de nouveaux problèmes et de
+                progresser dans ma manière de concevoir des applications.
+            </p>
+        </div>
+    </section>
+
+    <section class="home-section skills-section" aria-labelledby="skills-title">
+        <div class="section-heading section-heading--centered">
+            <p class="home-eyebrow">Compétences</p>
+            <h2 id="skills-title">Trois domaines pour créer des expériences variées</h2>
+            <p>Des compétences complémentaires que je développe au fil de mes projets.</p>
+        </div>
+
+        <div class="skills-grid">
+            <article class="skill-card">
+                <span class="skill-card__number">01</span>
+                <h3>Applications web</h3>
+                <p>Création d'interfaces responsives et d'applications structurées, du navigateur jusqu'à l'API.</p>
+                <ul><li>Blazor WebAssembly</li><li>HTML sémantique</li><li>CSS responsive</li></ul>
+            </article>
+            <article class="skill-card">
+                <span class="skill-card__number">02</span>
+                <h3>Applications mobiles</h3>
+                <p>Conception d'expériences adaptées aux usages mobiles et aux différents formats d'écran.</p>
+                <ul><li>Interfaces mobiles</li><li>Responsive</li><li>Expérience utilisateur</li></ul>
+            </article>
+            <article class="skill-card">
+                <span class="skill-card__number">03</span>
+                <h3>Jeux vidéo</h3>
+                <p>Exploration de la programmation ludique, des mécaniques de jeu et des univers interactifs.</p>
+                <ul><li>Gameplay</li><li>Logique de jeu</li><li>Prototypage</li></ul>
+            </article>
+        </div>
+    </section>
+
+    <section class="home-section featured-projects" aria-labelledby="projects-title">
+        <div class="section-heading section-heading--with-action">
+            <div>
+                <p class="home-eyebrow">Aperçu des projets</p>
+                <h2 id="projects-title">Des réalisations pour apprendre et expérimenter</h2>
+            </div>
+            <a class="text-link" href="/projects">Voir tous les projets →</a>
+        </div>
+
+        <div class="featured-projects__grid">
+            <ProjectCard Title="Gestionnaire de tâches"
+                         Description="Une application web pour organiser ses priorités et suivre son avancement."
+                         DetailUrl="/projects/gestionnaire-taches"
+                         ImageAlt="Aperçu temporaire du gestionnaire de tâches" />
+            <ProjectCard Title="Tableau de bord analytique"
+                         Description="Une interface claire pour consulter des indicateurs et comprendre leur évolution."
+                         DetailUrl="/projects/tableau-de-bord"
+                         ImageAlt="Aperçu temporaire du tableau de bord" />
+        </div>
+    </section>
+
+    <section class="home-section approach-section" aria-labelledby="approach-title">
+        <div class="section-heading">
+            <p class="home-eyebrow">Ma manière d'apprendre</p>
+            <h2 id="approach-title">Comprendre, expérimenter et progresser</h2>
+        </div>
+        <ol class="approach-list">
+            <li>
+                <span>01</span>
+                <div><h3>Comprendre</h3><p>Analyser le besoin et les contraintes avant de commencer à construire.</p></div>
+            </li>
+            <li>
+                <span>02</span>
+                <div><h3>Expérimenter</h3><p>Tester des solutions, confronter mes idées au réel et apprendre en pratiquant.</p></div>
+            </li>
+            <li>
+                <span>03</span>
+                <div><h3>Progresser</h3><p>Tirer parti des résultats et des retours pour améliorer chaque nouvelle version.</p></div>
+            </li>
+        </ol>
+    </section>
+
+    <section class="home-cta" aria-labelledby="cta-title">
+        <p class="home-eyebrow">Échangeons</p>
+        <h2 id="cta-title">Envie de discuter informatique ou développement ?</h2>
+        <p>Une opportunité d'emploi, un projet à partager ou simplement un sujet passionnant à évoquer : n'hésitez pas à me contacter.</p>
+        <div class="hero__actions">
+            <a class="button button--light" href="/contact">Me contacter</a>
+            <a class="button button--outline-light" href="/projects">Explorer mes projets</a>
+        </div>
+    </section>
+</main>

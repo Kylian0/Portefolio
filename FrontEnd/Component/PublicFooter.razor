@@ -1,0 +1,71 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@if (isVisible)
+{
+    <footer class="public-footer">
+        <div class="public-footer__content">
+            <div class="public-footer__intro">
+                <NavLink class="public-footer__name" href="/" Match="NavLinkMatch.All">Kylian</NavLink>
+                <p>Développeur passionné par la création d'applications web, mobiles et de jeux vidéo.</p>
+                <a class="public-footer__top" href="#top" aria-label="Revenir en haut de la page">
+                    Retour en haut <span aria-hidden="true">↑</span>
+                </a>
+            </div>
+
+            <nav class="public-footer__column" aria-label="Navigation du pied de page">
+                <h2>Navigation</h2>
+                <NavLink href="/" Match="NavLinkMatch.All">Accueil</NavLink>
+                <NavLink href="/projects">Projets</NavLink>
+                <NavLink href="/contact">Contact</NavLink>
+            </nav>
+
+            <div class="public-footer__column">
+                <h2>Domaines</h2>
+                <span>Applications web</span>
+                <span>Applications mobiles</span>
+                <span>Jeux vidéo</span>
+            </div>
+
+            <div class="public-footer__column">
+                <h2>Me retrouver</h2>
+                <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+                <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a>
+                <a href="mailto:contact@example.com">E-mail</a>
+            </div>
+        </div>
+
+        <div class="public-footer__bottom">
+            <span>© @DateTime.Now.Year Kylian</span>
+            <span>Portfolio personnel</span>
+        </div>
+    </footer>
+}
+
+@code {
+    private bool isVisible;
+
+    protected override void OnInitialized()
+    {
+        UpdateVisibility();
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        UpdateVisibility();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateVisibility()
+    {
+        var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+        isVisible = !relativeUri.StartsWith("admin", StringComparison.OrdinalIgnoreCase)
+            && !relativeUri.Contains("admin=true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}

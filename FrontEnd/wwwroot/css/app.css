@@ -3,11 +3,11 @@
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid var(--color-danger);
 }
 
 .validation-message {
-    color: red;
+    color: var(--color-danger);
 }
 
 #blazor-error-ui {
@@ -86,4 +86,66 @@ code {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+:root {
+    --color-background: #f7f8fc;
+    --color-background-subtle: #eef0f5;
+    --color-surface: #ffffff;
+    --color-text: #172033;
+    --color-text-soft: #252b38;
+    --color-muted: #5d6678;
+    --color-muted-light: #737c8d;
+    --color-primary: #5b5bd6;
+    --color-primary-hover: #4747b8;
+    --color-primary-soft: #e8e8ff;
+    --color-border: #e3e6ef;
+    --color-input-border: #cdd2df;
+    --color-success-background: #edfff4;
+    --color-success-border: #86d6a7;
+    --color-success-text: #176638;
+    --color-danger: #b32121;
+    --color-code-background: #171c28;
+    --color-code-text: #edf0f7;
+    --color-on-primary: #ffffff;
+    --shadow-soft: rgba(23, 32, 51, 0.08);
+    --shadow-strong: rgba(23, 32, 51, 0.14);
+    --navigation-background: rgba(247, 248, 252, 0.92);
+}
+
+:root[data-theme="dark"] {
+    --color-background: #11131a;
+    --color-background-subtle: #0c0e14;
+    --color-surface: #1b1e28;
+    --color-text: #f1f3f8;
+    --color-text-soft: #e2e5ec;
+    --color-muted: #b0b6c5;
+    --color-muted-light: #929aaa;
+    --color-primary: #9999ff;
+    --color-primary-hover: #b2b2ff;
+    --color-primary-soft: #292947;
+    --color-border: #343846;
+    --color-input-border: #4a5061;
+    --color-success-background: #173524;
+    --color-success-border: #377d54;
+    --color-success-text: #a7ebc1;
+    --color-danger: #ff9b9b;
+    --color-code-background: #090b10;
+    --color-code-text: #edf0f7;
+    --shadow-soft: rgba(0, 0, 0, 0.25);
+    --shadow-strong: rgba(0, 0, 0, 0.4);
+    --navigation-background: rgba(17, 19, 26, 0.92);
+}
+
+body {
+    background: var(--color-background);
+    color: var(--color-text);
+    transition: background-color 160ms ease, color 160ms ease;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    min-height: 100vh;
 }

@@ -1,0 +1,34 @@
+@inject IJSRuntime JSRuntime
+
+<button class="theme-toggle"
+        type="button"
+        title="@ButtonTitle"
+        aria-label="@ButtonTitle"
+        aria-pressed="@isDarkTheme"
+        @onclick="ToggleTheme">
+    <span aria-hidden="true">@(isDarkTheme ? "☀" : "☾")</span>
+</button>
+
+@code {
+    private bool isDarkTheme;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        isDarkTheme = await JSRuntime.InvokeAsync<bool>("portfolioTheme.isDark");
+        StateHasChanged();
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkTheme = await JSRuntime.InvokeAsync<bool>("portfolioTheme.toggle");
+    }
+
+    private string ButtonTitle => isDarkTheme
+        ? "Activer le thème clair"
+        : "Activer le thème sombre";
+}

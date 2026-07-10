@@ -1,0 +1,143 @@
+@page "/projects/{Slug}"
+@using FrontEnd.Services
+@inject IAdminAccessService AdminAccess
+@inject NavigationManager Navigation
+
+<PageTitle>@ProjectTitle | Portfolio</PageTitle>
+
+<main class="project-document-page">
+    <article class="project-document">
+        <header class="project-document__header">
+            <a class="project-document__back" href="/projects">← Retour aux projets</a>
+            @if (AdminMode && AdminAccess.IsAuthenticated)
+            {
+                <div class="project-document__admin-bar">
+                    <span>Mode administration</span>
+                    <button type="button" @onclick="ShowEditMessage">Modifier</button>
+                </div>
+                @if (showEditMessage)
+                {
+                    <p class="project-document__admin-message" role="status">L'éditeur de documentation sera disponible dans une prochaine version.</p>
+                }
+            }
+            <p class="project-document__category">Étude de cas</p>
+            <h1>@ProjectTitle</h1>
+            <p class="project-document__lead">
+                Cette documentation de démonstration illustre la manière dont je souhaite présenter mes réalisations,
+                mes choix techniques, les problèmes rencontrés et ce que chaque projet m'a permis d'apprendre.
+            </p>
+            <dl class="project-document__metadata">
+                <div>
+                    <dt>Projet de</dt>
+                    <dd>Kylian</dd>
+                </div>
+                <div>
+                    <dt>Technologies</dt>
+                    <dd>Blazor, ASP.NET Core</dd>
+                </div>
+                <div>
+                    <dt>Année</dt>
+                    <dd>2026</dd>
+                </div>
+            </dl>
+        </header>
+
+        <figure class="document-media">
+            <img src="images/project-placeholder.svg" alt="Aperçu temporaire de l'interface du projet" />
+            <figcaption>Aperçu de l'interface principale — image de démonstration.</figcaption>
+        </figure>
+
+        <section aria-labelledby="context-title">
+            <h2 id="context-title">Contexte et objectifs</h2>
+            <p>
+                Le projet répond à un besoin courant : retrouver rapidement une information utile sans naviguer
+                entre plusieurs outils. La première étape a consisté à identifier les actions essentielles et à
+                réduire le nombre d'étapes nécessaires pour les accomplir.
+            </p>
+            <p>
+                Cette documentation présente les choix réalisés, les principales fonctionnalités et les enseignements
+                tirés du développement. Son contenu reste temporaire en attendant les informations propres au projet.
+            </p>
+        </section>
+
+        <section aria-labelledby="features-title">
+            <h2 id="features-title">Fonctionnalités principales</h2>
+            <p>La première version se concentre volontairement sur un périmètre limité :</p>
+            <ul>
+                <li>création et organisation rapide des éléments ;</li>
+                <li>recherche et filtrage des informations ;</li>
+                <li>interface responsive adaptée aux ordinateurs et appareils mobiles ;</li>
+                <li>retours visuels clairs pour chaque action utilisateur.</li>
+            </ul>
+        </section>
+
+        <section aria-labelledby="approach-title">
+            <h2 id="approach-title">Approche technique</h2>
+            <p>
+                L'interface est découpée en composants ciblés et réutilisables. Les données de présentation restent
+                séparées du rendu afin de faciliter leur remplacement futur par une API.
+            </p>
+            <pre><code>public sealed record Project(
+    string Title,
+    string Description,
+    string Slug);</code></pre>
+            <p>
+                Cet exemple illustre une structure volontairement simple pour représenter un projet sans ajouter
+                de dépendance ou de couche superflue.
+            </p>
+        </section>
+
+        <section aria-labelledby="video-title">
+            <h2 id="video-title">Démonstration vidéo</h2>
+            <p>Une vidéo de présentation pourra être intégrée directement dans le document.</p>
+            <div class="document-video">
+                <iframe src="https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ"
+                        title="Vidéo de démonstration du projet"
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+            </div>
+        </section>
+
+        <section aria-labelledby="outcome-title">
+            <h2 id="outcome-title">Résultat et apprentissages</h2>
+            <p>
+                Cette première réalisation fournit une base cohérente et maintenable. Les prochaines itérations
+                pourront introduire la persistance des données, l'authentification et des outils de collaboration,
+                après validation des besoins réels des utilisateurs.
+            </p>
+            <blockquote>
+                Une interface réussie rend les actions importantes évidentes et laisse la complexité en arrière-plan.
+            </blockquote>
+        </section>
+    </article>
+</main>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "admin")]
+    public bool AdminMode { get; set; }
+
+    private bool showEditMessage;
+
+    protected override void OnParametersSet()
+    {
+        if (AdminMode && !AdminAccess.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/admin/login", replace: true);
+        }
+    }
+
+    private void ShowEditMessage() => showEditMessage = true;
+
+    private string ProjectTitle => Slug switch
+    {
+        "gestionnaire-taches" => "Gestionnaire de tâches",
+        "tableau-de-bord" => "Tableau de bord analytique",
+        "catalogue-interactif" => "Catalogue interactif",
+        "api-reservation" => "API de réservation",
+        _ => "Présentation du projet"
+    };
+}

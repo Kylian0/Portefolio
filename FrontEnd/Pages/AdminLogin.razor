@@ -1,0 +1,80 @@
+@page "/admin/login"
+@using System.ComponentModel.DataAnnotations
+@using FrontEnd.Services
+@inject IAdminAccessService AdminAccess
+@inject NavigationManager Navigation
+
+<PageTitle>Connexion | Administration</PageTitle>
+
+<main class="admin-login-page">
+    <section class="admin-login-card" aria-labelledby="login-title">
+        <a class="admin-login-card__back" href="/">← Retour au portfolio</a>
+        <p class="admin-eyebrow">Espace privé</p>
+        <h1 id="login-title">Administration</h1>
+        <p class="admin-login-card__intro">Connectez-vous pour accéder au tableau de bord du portfolio.</p>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="admin-login-error" role="alert">@errorMessage</div>
+        }
+
+        <EditForm Model="credentials" OnValidSubmit="HandleLogin" FormName="admin-login">
+            <DataAnnotationsValidator />
+
+            <div class="form-field">
+                <label for="admin-username">Identifiant</label>
+                <InputText id="admin-username" @bind-Value="credentials.Username" autocomplete="username" />
+                <ValidationMessage For="@(() => credentials.Username)" />
+            </div>
+
+            <div class="form-field">
+                <label for="admin-password">Mot de passe</label>
+                <InputText id="admin-password" @bind-Value="credentials.Password" type="password" autocomplete="current-password" />
+                <ValidationMessage For="@(() => credentials.Password)" />
+            </div>
+
+            <button class="admin-login-submit" type="submit">Se connecter</button>
+        </EditForm>
+
+        <div class="admin-login-hint">
+            <strong>Accès de démonstration</strong>
+            <span>Identifiant : admin</span>
+            <span>Mot de passe : portfolio-demo</span>
+        </div>
+    </section>
+</main>
+
+@code {
+    private readonly LoginCredentials credentials = new();
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (AdminAccess.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/admin");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+
+        if (await AdminAccess.SignInAsync(credentials.Username, credentials.Password))
+        {
+            Navigation.NavigateTo("/admin");
+            return;
+        }
+
+        errorMessage = "L'identifiant ou le mot de passe est incorrect.";
+    }
+
+    private sealed class LoginCredentials
+    {
+        [Required(ErrorMessage = "L'identifiant est obligatoire.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le mot de passe est obligatoire.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

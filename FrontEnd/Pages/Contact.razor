@@ -1,0 +1,119 @@
+@page "/contact"
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Contact | Portfolio</PageTitle>
+
+<main class="contact-page">
+    <header class="contact-header">
+        <div>
+            <p class="contact-header__eyebrow">Prendre contact</p>
+            <h1>Une idée, une opportunité ou simplement envie d'échanger&nbsp;?</h1>
+        </div>
+        <p>
+            Je suis toujours ouvert aux conversations autour du développement, de l'informatique
+            et des projets qui méritent d'être partagés. Écrivez-moi librement, je vous répondrai dès que possible.
+        </p>
+    </header>
+
+    <div class="contact-layout">
+        <aside class="contact-details" aria-labelledby="details-title">
+            <div>
+                <p class="contact-details__label">Pourquoi m'écrire ?</p>
+                <h2 id="details-title">Toutes les conversations sont les bienvenues.</h2>
+            </div>
+
+            <ul class="contact-topics">
+                <li><span aria-hidden="true">01</span><div><strong>Opportunité professionnelle</strong><p>Un poste, une alternance ou une collaboration à évoquer.</p></div></li>
+                <li><span aria-hidden="true">02</span><div><strong>Projet et développement</strong><p>Une idée, un retour d'expérience ou une question technique.</p></div></li>
+                <li><span aria-hidden="true">03</span><div><strong>Discussion informatique</strong><p>Web, mobile, jeu vidéo ou simple échange entre passionnés.</p></div></li>
+            </ul>
+
+            <div class="contact-socials">
+                <p class="contact-details__label">Me retrouver ailleurs</p>
+                <ul>
+                    <li><span>GitHub</span><a href="https://github.com/" target="_blank" rel="noopener noreferrer">Profil à renseigner <span aria-hidden="true">↗</span></a></li>
+                    <li><span>LinkedIn</span><a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">Profil à renseigner <span aria-hidden="true">↗</span></a></li>
+                    <li><span>E-mail</span><span>Adresse à renseigner</span></li>
+                </ul>
+            </div>
+        </aside>
+
+        <section class="contact-form-panel" aria-labelledby="form-title">
+            <div class="contact-form-panel__heading">
+                <p class="contact-details__label">Votre message</p>
+                <h2 id="form-title">Parlons-en</h2>
+                <p>Tous les champs sont obligatoires.</p>
+            </div>
+
+            @if (isSubmitted)
+            {
+                <div class="contact-success" role="status">
+                    <strong>Message prêt à partir.</strong>
+                    <span>L'envoi a bien été simulé pour cette démonstration.</span>
+                </div>
+            }
+
+            <EditForm Model="contactForm" OnValidSubmit="HandleValidSubmit" FormName="contact">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="contact-form-row">
+                    <div class="form-field">
+                        <label for="contact-name">Nom</label>
+                        <InputText id="contact-name" @bind-Value="contactForm.Name" autocomplete="name" placeholder="Votre nom" />
+                        <ValidationMessage For="@(() => contactForm.Name)" />
+                    </div>
+
+                    <div class="form-field">
+                        <label for="contact-email">E-mail</label>
+                        <InputText id="contact-email" @bind-Value="contactForm.Email" type="email" autocomplete="email" placeholder="vous@exemple.fr" />
+                        <ValidationMessage For="@(() => contactForm.Email)" />
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <label for="contact-subject">Sujet</label>
+                    <InputText id="contact-subject" @bind-Value="contactForm.Subject" placeholder="De quoi souhaitez-vous parler ?" />
+                    <ValidationMessage For="@(() => contactForm.Subject)" />
+                </div>
+
+                <div class="form-field">
+                    <label for="contact-message">Message</label>
+                    <InputTextArea id="contact-message" @bind-Value="contactForm.Message" rows="7" placeholder="Écrivez votre message ici…" />
+                    <ValidationMessage For="@(() => contactForm.Message)" />
+                </div>
+
+                <button class="contact-submit" type="submit">Envoyer le message <span aria-hidden="true">→</span></button>
+            </EditForm>
+        </section>
+    </div>
+</main>
+
+@code {
+    private readonly ContactFormModel contactForm = new();
+    private bool isSubmitted;
+
+    private void HandleValidSubmit()
+    {
+        isSubmitted = true;
+    }
+
+    private sealed class ContactFormModel
+    {
+        [Required(ErrorMessage = "Le nom est obligatoire.")]
+        [StringLength(80, MinimumLength = 2, ErrorMessage = "Le nom doit contenir entre 2 et 80 caractères.")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "L'adresse e-mail est obligatoire.")]
+        [EmailAddress(ErrorMessage = "Saisissez une adresse e-mail valide.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le sujet est obligatoire.")]
+        [StringLength(120, MinimumLength = 3, ErrorMessage = "Le sujet doit contenir entre 3 et 120 caractères.")]
+        public string Subject { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le message est obligatoire.")]
+        [StringLength(2000, MinimumLength = 10, ErrorMessage = "Le message doit contenir entre 10 et 2 000 caractères.")]
+        public string Message { get; set; } = string.Empty;
+    }
+}

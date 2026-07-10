@@ -1,0 +1,119 @@
+@page "/projects"
+
+<PageTitle>Projets | Portfolio</PageTitle>
+
+<main class="projects-page">
+    <header class="projects-header">
+        <div>
+            <p class="projects-header__eyebrow">Réalisations</p>
+            <h1>Explorer mes projets</h1>
+        </div>
+        <p>
+            Une sélection de projets réalisés pour apprendre, expérimenter et mettre en pratique
+            mes compétences dans le web, le mobile et le jeu vidéo.
+        </p>
+    </header>
+
+    <section class="projects-toolbar" aria-label="Recherche et filtres des projets">
+        <label class="projects-search">
+            <span class="visually-hidden">Rechercher un projet</span>
+            <input type="search" placeholder="Rechercher un projet…" @bind="searchTerm" @bind:event="oninput" />
+        </label>
+
+        <div class="projects-filters">
+            <label>
+                <span>Type</span>
+                <select @bind="selectedType">
+                    <option value="">Tous</option>
+                    @foreach (var type in projectTypes) { <option value="@type">@type</option> }
+                </select>
+            </label>
+            <label>
+                <span>Langage</span>
+                <select @bind="selectedLanguage">
+                    <option value="">Tous</option>
+                    @foreach (var language in languages) { <option value="@language">@language</option> }
+                </select>
+            </label>
+            <label>
+                <span>Technologie</span>
+                <select @bind="selectedTechnology">
+                    <option value="">Toutes</option>
+                    @foreach (var technology in technologies) { <option value="@technology">@technology</option> }
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <div class="projects-results">
+        <p><strong>@FilteredProjects.Count</strong> projet(s)</p>
+        @if (HasActiveFilters)
+        {
+            <button type="button" @onclick="ResetFilters">Réinitialiser</button>
+        }
+    </div>
+
+    @if (FilteredProjects.Count > 0)
+    {
+        <section class="projects-grid" aria-label="Liste des projets">
+            @foreach (var project in FilteredProjects)
+            {
+                <ProjectCard Title="@project.Title"
+                             Description="@project.Description"
+                             DetailUrl="@project.DetailUrl"
+                             Category="@project.Type"
+                             Technologies="@project.AllTechnologies"
+                             Variant="gallery"
+                             ImageAlt="@($"Aperçu temporaire du projet {project.Title}")" />
+            }
+        </section>
+    }
+    else
+    {
+        <section class="projects-empty">
+            <strong>Aucun projet trouvé</strong>
+            <p>Essayez de modifier votre recherche ou de réinitialiser les filtres.</p>
+            <button type="button" @onclick="ResetFilters">Réinitialiser les filtres</button>
+        </section>
+    }
+</main>
+
+@code {
+    private string searchTerm = string.Empty;
+    private string selectedType = string.Empty;
+    private string selectedLanguage = string.Empty;
+    private string selectedTechnology = string.Empty;
+
+    private readonly string[] projectTypes = ["Web", "Mobile", "Jeu vidéo"];
+    private readonly string[] languages = ["C#", "C++", "Java"];
+    private readonly string[] technologies = ["Blazor", "ASP.NET Core", ".NET MAUI", "Unity", "Unreal Engine"];
+
+    private readonly ProjectPreview[] projects =
+    [
+        new("Gestionnaire de tâches", "Une application web permettant d'organiser ses tâches, ses priorités et son avancement.", "/projects/gestionnaire-taches", "Web", ["C#"], ["Blazor", "ASP.NET Core"]),
+        new("Tableau de bord analytique", "Une interface claire pour consulter des indicateurs et suivre leur évolution.", "/projects/tableau-de-bord", "Web", ["C#"], ["Blazor"]),
+        new("Catalogue interactif", "Une expérience mobile de consultation fluide avec recherche et filtrage de contenus.", "/projects/catalogue-interactif", "Mobile", ["C#"], [".NET MAUI"]),
+        new("API de réservation", "Un service conçu pour gérer des disponibilités et des demandes de réservation.", "/projects/api-reservation", "Web", ["C#"], ["ASP.NET Core"])
+    ];
+
+    private List<ProjectPreview> FilteredProjects => projects.Where(project =>
+        (string.IsNullOrWhiteSpace(searchTerm) || project.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrEmpty(selectedType) || project.Type == selectedType) &&
+        (string.IsNullOrEmpty(selectedLanguage) || project.Languages.Contains(selectedLanguage)) &&
+        (string.IsNullOrEmpty(selectedTechnology) || project.Technologies.Contains(selectedTechnology))).ToList();
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchTerm) || !string.IsNullOrEmpty(selectedType) || !string.IsNullOrEmpty(selectedLanguage) || !string.IsNullOrEmpty(selectedTechnology);
+
+    private void ResetFilters()
+    {
+        searchTerm = string.Empty;
+        selectedType = string.Empty;
+        selectedLanguage = string.Empty;
+        selectedTechnology = string.Empty;
+    }
+
+    private sealed record ProjectPreview(string Title, string Description, string DetailUrl, string Type, string[] Languages, string[] Technologies)
+    {
+        public IReadOnlyList<string> AllTechnologies => [.. Languages, .. Technologies];
+    }
+}

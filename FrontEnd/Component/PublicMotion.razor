@@ -1,0 +1,36 @@
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+@code {
+    private bool pendingInitialization = true;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!pendingInitialization)
+        {
+            return;
+        }
+
+        pendingInitialization = false;
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var isPublicPage = !relativePath.StartsWith("admin", StringComparison.OrdinalIgnoreCase);
+        await JSRuntime.InvokeVoidAsync("portfolioMotion.initialize", isPublicPage);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        pendingInitialization = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}

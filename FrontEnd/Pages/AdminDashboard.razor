@@ -1,0 +1,127 @@
+@page "/admin"
+@using FrontEnd.Models
+@using FrontEnd.Services
+@inject IAdminAccessService AdminAccess
+@inject IAdminProjectService ProjectService
+@inject IAdminMessageService MessageService
+@inject NavigationManager Navigation
+
+<PageTitle>Tableau de bord | Administration</PageTitle>
+
+@if (AdminAccess.IsAuthenticated)
+{
+    <main class="admin-dashboard">
+        <aside class="admin-sidebar">
+            <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
+            <nav aria-label="Navigation de l'administration">
+                <a class="is-active" href="/admin">Vue d'ensemble</a>
+                <a href="/admin/projects">Projets</a>
+                <a href="/admin/messages">Messages</a>
+                <a href="/">Voir le portfolio</a>
+            </nav>
+        </aside>
+
+        <div class="admin-main admin-overview">
+            <header class="admin-header admin-overview__header">
+                <div>
+                    <p class="admin-eyebrow">Vue d'ensemble</p>
+                    <h1>Bonjour Kylian</h1>
+                    <p>Voici les informations importantes de votre portfolio.</p>
+                </div>
+                <button type="button" @onclick="HandleLogout">Se déconnecter</button>
+            </header>
+
+            <section class="admin-stats admin-overview__stats" aria-label="Statistiques principales">
+                <a href="/admin/projects"><span>Projets</span><strong>@projects.Count</strong><small>Gérer les réalisations →</small></a>
+                <a href="/admin/messages"><span>Messages reçus</span><strong>@messages.Count</strong><small>Consulter la messagerie →</small></a>
+                <a href="/admin/messages"><span>Messages non lus</span><strong>@UnreadCount</strong><small>@UnreadSummary</small></a>
+                <article><span>Visites ce mois-ci</span><strong>248</strong><small>Donnée de démonstration</small></article>
+            </section>
+
+            <section class="admin-quick-actions" aria-labelledby="quick-actions-title">
+                <div><p class="admin-eyebrow">Raccourcis</p><h2 id="quick-actions-title">Accès rapides</h2></div>
+                <div class="admin-quick-actions__links">
+                    <a href="/admin/projects"><strong>Gérer les projets</strong><span>Modifier les cartes et la documentation</span></a>
+                    <a href="/admin/messages"><strong>Ouvrir les messages</strong><span>Consulter et traiter les prises de contact</span></a>
+                    <a href="/" target="_blank"><strong>Voir le portfolio</strong><span>Ouvrir le site public dans un nouvel onglet</span></a>
+                </div>
+            </section>
+
+            <div class="admin-overview__columns">
+                <section class="admin-panel admin-overview-panel">
+                    <div class="admin-panel__heading">
+                        <div><h2>Derniers messages</h2><p>Les prises de contact les plus récentes.</p></div>
+                        <a href="/admin/messages">Tout afficher</a>
+                    </div>
+                    <ul class="admin-overview-messages">
+                        @foreach (var message in LatestMessages)
+                        {
+                            <li class="@(message.IsRead ? null : "is-unread")">
+                                <span class="admin-overview-avatar" aria-hidden="true">@GetInitials(message.SenderName)</span>
+                                <div><strong>@message.SenderName</strong><span>@message.Subject</span></div>
+                                <time datetime="@message.ReceivedAt.ToString("O")">@FormatRelativeDate(message.ReceivedAt)</time>
+                            </li>
+                        }
+                    </ul>
+                </section>
+
+                <section class="admin-panel admin-overview-panel">
+                    <div class="admin-panel__heading">
+                        <div><h2>Projets récents</h2><p>Aperçu des contenus administrables.</p></div>
+                        <a href="/admin/projects">Tout afficher</a>
+                    </div>
+                    <ul class="admin-overview-projects">
+                        @foreach (var project in LatestProjects)
+                        {
+                            <li>
+                                <img src="@project.ImageUrl" alt="" />
+                                <div><strong>@project.Name</strong><span>@project.Type · @string.Join(", ", project.Technologies.Take(2))</span></div>
+                                <a href="@($"/projects/{project.Slug}?admin=true")" aria-label="Ouvrir la documentation du projet @project.Name">→</a>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            </div>
+
+            <section class="admin-panel admin-overview-activity">
+                <div class="admin-panel__heading"><div><h2>Activité récente</h2><p>Quelques événements utiles pour suivre le portfolio.</p></div><span>Démonstration</span></div>
+                <ol>
+                    <li><span class="admin-activity-dot"></span><div><strong>Nouveau message reçu</strong><p>Camille Bernard a envoyé « Opportunité de développeur junior ».</p></div><time>Il y a 2 h</time></li>
+                    <li><span class="admin-activity-dot"></span><div><strong>Documentation mise à jour</strong><p>Le contenu du projet Gestionnaire de tâches a été modifié.</p></div><time>Hier</time></li>
+                    <li><span class="admin-activity-dot"></span><div><strong>Projet ajouté</strong><p>Le projet Expérience 3D a été ajouté à la liste.</p></div><time>Il y a 5 jours</time></li>
+                </ol>
+            </section>
+        </div>
+    </main>
+}
+
+@code {
+    private IReadOnlyList<AdminProject> projects = [];
+    private IReadOnlyList<AdminMessage> messages = [];
+    private int UnreadCount => messages.Count(message => !message.IsRead);
+    private string UnreadSummary => UnreadCount == 0 ? "Tout est à jour" : "À consulter rapidement";
+    private IEnumerable<AdminMessage> LatestMessages => messages.OrderByDescending(message => message.ReceivedAt).Take(3);
+    private IEnumerable<AdminProject> LatestProjects => projects.Take(3);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login", replace: true); return; }
+        projects = await ProjectService.GetAllAsync();
+        messages = await MessageService.GetAllAsync();
+    }
+
+    private static string GetInitials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpperInvariant(part[0])));
+
+    private static string FormatRelativeDate(DateTime date)
+    {
+        if (date.Date == DateTime.Today) return "Aujourd'hui";
+        if (date.Date == DateTime.Today.AddDays(-1)) return "Hier";
+        return date.ToString("dd/MM/yyyy");
+    }
+
+    private async Task HandleLogout()
+    {
+        await AdminAccess.SignOutAsync();
+        Navigation.NavigateTo("/admin/login", replace: true);
+    }
+}

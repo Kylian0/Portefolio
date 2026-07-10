@@ -1,0 +1,170 @@
+@page "/admin/projects"
+@using FrontEnd.Models
+@using FrontEnd.Services
+@inject IAdminAccessService AdminAccess
+@inject IAdminProjectService ProjectService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Gestion des projets | Administration</PageTitle>
+
+@if (AdminAccess.IsAuthenticated)
+{
+    <main class="admin-dashboard">
+        <aside class="admin-sidebar">
+            <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
+            <nav aria-label="Navigation de l'administration">
+                <a href="/admin">Vue d'ensemble</a>
+                <a class="is-active" href="/admin/projects">Projets</a>
+                <a href="/admin/messages">Messages</a>
+                <a href="/">Voir le portfolio</a>
+            </nav>
+        </aside>
+
+        <div class="admin-main">
+            <header class="admin-header admin-projects-header">
+                <div><p class="admin-eyebrow">Administration</p><h1>Gestion des projets</h1></div>
+                <span>@FilteredProjects.Count projet(s)</span>
+            </header>
+
+            <section class="admin-project-tools" aria-label="Recherche et filtres">
+                <label class="admin-project-search">
+                    <span class="visually-hidden">Rechercher un projet</span>
+                    <input type="search" placeholder="Rechercher par nom…" @bind="searchTerm" @bind:event="oninput" />
+                </label>
+                <button type="button" class="admin-filter-toggle" aria-expanded="@filtersOpen" @onclick="() => filtersOpen = !filtersOpen">
+                    Filtres @if (ActiveFilterCount > 0) { <span>@ActiveFilterCount</span> }
+                </button>
+            </section>
+
+            @if (filtersOpen)
+            {
+                <section class="admin-filters" aria-label="Filtres des projets">
+                    <fieldset>
+                        <legend>Type de projet</legend>
+                        @foreach (var option in projectTypes)
+                        {
+                            <label><input type="checkbox" checked="@selectedTypes.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedTypes, option, eventArgs)" /> @option</label>
+                        }
+                    </fieldset>
+                    <fieldset>
+                        <legend>Langage</legend>
+                        @foreach (var option in languages)
+                        {
+                            <label><input type="checkbox" checked="@selectedLanguages.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedLanguages, option, eventArgs)" /> @option</label>
+                        }
+                    </fieldset>
+                    <fieldset>
+                        <legend>Framework ou moteur</legend>
+                        @foreach (var option in frameworks)
+                        {
+                            <label><input type="checkbox" checked="@selectedFrameworks.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedFrameworks, option, eventArgs)" /> @option</label>
+                        }
+                    </fieldset>
+                    <button type="button" class="admin-clear-filters" @onclick="ClearFilters">Réinitialiser les filtres</button>
+                </section>
+            }
+
+            @if (FilteredProjects.Count > 0)
+            {
+                <section class="admin-project-grid" aria-label="Liste des projets administrables">
+                    @foreach (var project in FilteredProjects)
+                    {
+                        <AdminProjectCard Project="project" OnSelected="OpenProject" />
+                    }
+                </section>
+            }
+            else
+            {
+                <div class="admin-project-empty">Aucun projet ne correspond à votre recherche et aux filtres sélectionnés.</div>
+            }
+        </div>
+    </main>
+}
+
+@if (selectedProject is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseProject">
+        <section class="admin-project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title" @onclick:stopPropagation="true">
+            <header><div><p class="admin-eyebrow">Modifier le projet</p><h2 id="project-modal-title">@selectedProject.Name</h2></div><button type="button" aria-label="Fermer" @onclick="CloseProject">×</button></header>
+            <div class="admin-project-form">
+                <div class="form-field"><label for="project-name">Nom</label><input id="project-name" @bind="selectedProject.Name" /></div>
+                <div class="form-field"><label for="project-description">Description</label><textarea id="project-description" rows="4" @bind="selectedProject.Description"></textarea></div>
+                <div class="form-field"><label for="project-image">Adresse de l'image</label><input id="project-image" @bind="selectedProject.ImageUrl" /></div>
+                <div class="form-field"><label for="project-type">Type</label><input id="project-type" @bind="selectedProject.Type" /></div>
+                <div class="form-field"><label for="project-technologies">Technologies (séparées par des virgules)</label><input id="project-technologies" value="@technologyInput" @oninput="UpdateTechnologyInput" /></div>
+            </div>
+            @if (!string.IsNullOrEmpty(modalMessage)) { <p class="admin-modal-message" role="status">@modalMessage</p> }
+            <footer>
+                <button type="button" class="admin-danger-button" @onclick="DeleteProject">Supprimer</button>
+                <a href="@($"/projects/{selectedProject.Slug}?admin=true")">Ouvrir la documentation</a>
+                <button type="button" class="admin-primary-button" @onclick="SaveProject">Enregistrer</button>
+            </footer>
+        </section>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<AdminProject> projects = [];
+    private AdminProject? selectedProject;
+    private string searchTerm = string.Empty;
+    private string technologyInput = string.Empty;
+    private string? modalMessage;
+    private bool filtersOpen;
+    private readonly HashSet<string> selectedTypes = [];
+    private readonly HashSet<string> selectedLanguages = [];
+    private readonly HashSet<string> selectedFrameworks = [];
+    private readonly string[] projectTypes = ["Web", "Mobile", "Jeu vidéo"];
+    private readonly string[] languages = ["C#", "C++", "Java"];
+    private readonly string[] frameworks = ["ASP.NET Core", "Blazor", ".NET MAUI", "Unity", "Unreal Engine"];
+
+    private List<AdminProject> FilteredProjects => projects.Where(project =>
+        (string.IsNullOrWhiteSpace(searchTerm) || project.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (selectedTypes.Count == 0 || selectedTypes.Contains(project.Type)) &&
+        (selectedLanguages.Count == 0 || project.Languages.Any(selectedLanguages.Contains)) &&
+        (selectedFrameworks.Count == 0 || project.Frameworks.Any(selectedFrameworks.Contains))).ToList();
+
+    private int ActiveFilterCount => selectedTypes.Count + selectedLanguages.Count + selectedFrameworks.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login", replace: true); return; }
+        projects = await ProjectService.GetAllAsync();
+    }
+
+    private void ToggleFilter(HashSet<string> target, string value, ChangeEventArgs args)
+    {
+        if (args.Value is true) target.Add(value); else target.Remove(value);
+    }
+
+    private void ClearFilters() { selectedTypes.Clear(); selectedLanguages.Clear(); selectedFrameworks.Clear(); }
+
+    private void OpenProject(AdminProject project)
+    {
+        selectedProject = new AdminProject { Slug = project.Slug, Name = project.Name, Description = project.Description, ImageUrl = project.ImageUrl, Type = project.Type, Languages = [.. project.Languages], Frameworks = [.. project.Frameworks] };
+        technologyInput = string.Join(", ", selectedProject.Technologies);
+        modalMessage = null;
+    }
+
+    private void CloseProject() => selectedProject = null;
+    private void UpdateTechnologyInput(ChangeEventArgs args) => technologyInput = args.Value?.ToString() ?? string.Empty;
+
+    private async Task SaveProject()
+    {
+        if (selectedProject is null) return;
+        var technologies = technologyInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        selectedProject.Languages = technologies.Where(languages.Contains).ToList();
+        selectedProject.Frameworks = technologies.Where(item => !selectedProject.Languages.Contains(item)).ToList();
+        await ProjectService.UpdateAsync(selectedProject);
+        projects = await ProjectService.GetAllAsync();
+        modalMessage = "Les modifications ont été enregistrées localement.";
+    }
+
+    private async Task DeleteProject()
+    {
+        if (selectedProject is null || !await JSRuntime.InvokeAsync<bool>("confirm", $"Supprimer « {selectedProject.Name} » ? Cette action est simulée.")) return;
+        await ProjectService.DeleteAsync(selectedProject.Slug);
+        projects = await ProjectService.GetAllAsync();
+        selectedProject = null;
+    }
+}

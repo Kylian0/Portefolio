@@ -1,0 +1,173 @@
+@page "/admin/messages"
+@using FrontEnd.Models
+@using FrontEnd.Services
+@inject IAdminAccessService AdminAccess
+@inject IAdminMessageService MessageService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Gestion des messages | Administration</PageTitle>
+
+@if (AdminAccess.IsAuthenticated)
+{
+    <main class="admin-dashboard">
+        <aside class="admin-sidebar">
+            <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
+            <nav aria-label="Navigation de l'administration">
+                <a href="/admin">Vue d'ensemble</a>
+                <a href="/admin/projects">Projets</a>
+                <a class="is-active" href="/admin/messages">Messages</a>
+                <a href="/">Voir le portfolio</a>
+            </nav>
+        </aside>
+
+        <div class="admin-main">
+            <header class="admin-header admin-messages-header">
+                <div><p class="admin-eyebrow">Administration</p><h1>Gestion des messages</h1></div>
+                <span>@UnreadCount non lu(s)</span>
+            </header>
+
+            <section class="admin-project-tools" aria-label="Recherche et filtres des messages">
+                <label class="admin-project-search">
+                    <span class="visually-hidden">Rechercher un message</span>
+                    <input type="search" placeholder="Rechercher par nom, e-mail ou sujet…" @bind="searchTerm" @bind:event="oninput" />
+                </label>
+                <button type="button" class="admin-filter-toggle" aria-expanded="@filtersOpen" @onclick="() => filtersOpen = !filtersOpen">Filtres</button>
+            </section>
+
+            @if (filtersOpen)
+            {
+                <section class="admin-message-filters" aria-label="Filtres des messages">
+                    <label>Statut
+                        <select @bind="statusFilter"><option value="all">Tous</option><option value="unread">Non lus</option><option value="read">Lus</option></select>
+                    </label>
+                    <label>Date de réception
+                        <select @bind="dateFilter"><option value="all">Toutes les dates</option><option value="today">Aujourd'hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select>
+                    </label>
+                    <label>Ordre
+                        <select @bind="sortOrder"><option value="newest">Plus récents</option><option value="oldest">Plus anciens</option></select>
+                    </label>
+                    <button type="button" class="admin-clear-filters" @onclick="ClearFilters">Réinitialiser</button>
+                </section>
+            }
+
+            <section class="admin-panel admin-messages-panel" aria-labelledby="messages-list-title">
+                <div class="admin-panel__heading">
+                    <div><h2 id="messages-list-title">Boîte de réception</h2><p>@FilteredMessages.Count message(s) affiché(s)</p></div>
+                </div>
+
+                @if (FilteredMessages.Count > 0)
+                {
+                    <div class="admin-table-wrapper">
+                        <table class="admin-messages-table">
+                            <thead><tr><th>Expéditeur</th><th>E-mail</th><th>Sujet</th><th>Reçu le</th><th>Statut</th></tr></thead>
+                            <tbody>
+                                @foreach (var message in FilteredMessages)
+                                {
+                                    <tr class="@(message.IsRead ? null : "is-unread")" @onclick="() => OpenMessage(message)" tabindex="0" @onkeydown="args => HandleRowKey(args, message)">
+                                        <td>@message.SenderName</td>
+                                        <td>@message.SenderEmail</td>
+                                        <td>@message.Subject</td>
+                                        <td><time datetime="@message.ReceivedAt.ToString("O")">@message.ReceivedAt.ToString("dd/MM/yyyy HH:mm")</time></td>
+                                        <td><span class="admin-message-status @(message.IsRead ? "is-read" : null)">@(message.IsRead ? "Lu" : "Non lu")</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-project-empty">Aucun message ne correspond à votre recherche.</div>
+                }
+            </section>
+        </div>
+    </main>
+}
+
+@if (selectedMessage is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseMessage">
+        <article class="admin-project-modal admin-message-modal" role="dialog" aria-modal="true" aria-labelledby="message-modal-title" @onclick:stopPropagation="true">
+            <header>
+                <div><p class="admin-eyebrow">Message reçu le @selectedMessage.ReceivedAt.ToString("dd/MM/yyyy à HH:mm")</p><h2 id="message-modal-title">@selectedMessage.Subject</h2></div>
+                <button type="button" aria-label="Fermer" @onclick="CloseMessage">×</button>
+            </header>
+            <dl class="admin-message-sender">
+                <div><dt>Expéditeur</dt><dd>@selectedMessage.SenderName</dd></div>
+                <div><dt>E-mail</dt><dd><a href="mailto:@selectedMessage.SenderEmail">@selectedMessage.SenderEmail</a></dd></div>
+            </dl>
+            <div class="admin-message-content">@selectedMessage.Content</div>
+            @if (!string.IsNullOrEmpty(modalMessage)) { <p class="admin-modal-message" role="status">@modalMessage</p> }
+            <footer>
+                <button type="button" class="admin-danger-button" @onclick="DeleteMessage">Supprimer</button>
+                <button type="button" @onclick="ToggleReadStatus">Marquer comme @(selectedMessage.IsRead ? "non lu" : "lu")</button>
+                <button type="button" class="admin-primary-button" @onclick="PrepareReply">Répondre</button>
+            </footer>
+        </article>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<AdminMessage> messages = [];
+    private AdminMessage? selectedMessage;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+    private string dateFilter = "all";
+    private string sortOrder = "newest";
+    private string? modalMessage;
+    private bool filtersOpen;
+
+    private int UnreadCount => messages.Count(message => !message.IsRead);
+
+    private List<AdminMessage> FilteredMessages
+    {
+        get
+        {
+            var minimumDate = dateFilter switch { "today" => DateTime.Today, "week" => DateTime.Now.AddDays(-7), "month" => DateTime.Now.AddDays(-30), _ => DateTime.MinValue };
+            var result = messages.Where(message =>
+                (string.IsNullOrWhiteSpace(searchTerm) || message.SenderName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || message.SenderEmail.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || message.Subject.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+                (statusFilter == "all" || (statusFilter == "read" && message.IsRead) || (statusFilter == "unread" && !message.IsRead)) &&
+                message.ReceivedAt >= minimumDate);
+            return (sortOrder == "oldest" ? result.OrderBy(message => message.ReceivedAt) : result.OrderByDescending(message => message.ReceivedAt)).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login", replace: true); return; }
+        messages = await MessageService.GetAllAsync();
+    }
+
+    private async Task OpenMessage(AdminMessage message)
+    {
+        selectedMessage = message;
+        modalMessage = null;
+        if (!message.IsRead) { await MessageService.SetReadStatusAsync(message.Id, true); message.IsRead = true; }
+    }
+
+    private void HandleRowKey(KeyboardEventArgs args, AdminMessage message)
+    {
+        if (args.Key is "Enter" or " ") _ = OpenMessage(message);
+    }
+
+    private void CloseMessage() => selectedMessage = null;
+    private void ClearFilters() { statusFilter = "all"; dateFilter = "all"; sortOrder = "newest"; }
+
+    private async Task ToggleReadStatus()
+    {
+        if (selectedMessage is null) return;
+        selectedMessage.IsRead = !selectedMessage.IsRead;
+        await MessageService.SetReadStatusAsync(selectedMessage.Id, selectedMessage.IsRead);
+    }
+
+    private void PrepareReply() => modalMessage = "La fonctionnalité de réponse sera disponible dans une prochaine version.";
+
+    private async Task DeleteMessage()
+    {
+        if (selectedMessage is null || !await JSRuntime.InvokeAsync<bool>("confirm", $"Supprimer le message de {selectedMessage.SenderName} ?")) return;
+        await MessageService.DeleteAsync(selectedMessage.Id);
+        messages = await MessageService.GetAllAsync();
+        selectedMessage = null;
+    }
+}
