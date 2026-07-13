@@ -6,19 +6,19 @@ namespace BackEnd.Services;
 
 public sealed class ProjectService(IProjectRepository projectRepository) : IProjectService
 {
-    public async Task<IReadOnlyList<ProjectReadDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProjectDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var projects = await projectRepository.GetAllAsync(cancellationToken);
         return projects.Select(MapToDto).ToArray();
     }
 
-    public async Task<ProjectReadDto?> GetByIdAsync(uint id, CancellationToken cancellationToken = default)
+    public async Task<ProjectDto?> GetByIdAsync(uint id, CancellationToken cancellationToken = default)
     {
         var project = await projectRepository.GetByIdAsync(id, cancellationToken);
         return project is null ? null : MapToDto(project);
     }
 
-    public async Task<ProjectReadDto> CreateAsync(ProjectCreateDto project, CancellationToken cancellationToken = default)
+    public async Task<ProjectDto> CreateAsync(ProjectDto project, CancellationToken cancellationToken = default)
     {
         var entity = new Project
         {
@@ -39,9 +39,9 @@ public sealed class ProjectService(IProjectRepository projectRepository) : IProj
         return MapToDto(await projectRepository.CreateAsync(entity, cancellationToken));
     }
 
-    public async Task<ProjectReadDto?> UpdateAsync(
+    public async Task<ProjectDto?> UpdateAsync(
         uint id,
-        ProjectUpdateDto project,
+        ProjectDto project,
         CancellationToken cancellationToken = default)
     {
         var entity = new Project
@@ -68,20 +68,22 @@ public sealed class ProjectService(IProjectRepository projectRepository) : IProj
     public Task<bool> DeleteAsync(uint id, CancellationToken cancellationToken = default) =>
         projectRepository.DeleteAsync(id, cancellationToken);
 
-    private static ProjectReadDto MapToDto(Project project) => new(
-        project.Id,
-        project.Title,
-        project.Slug,
-        project.ShortDescription,
-        project.ThumbnailUrl,
-        project.RepositoryUrl,
-        project.DemoUrl,
-        project.Status,
-        project.IsFeatured,
-        project.DisplayOrder,
-        project.StartedAt,
-        project.CompletedAt,
-        project.CreatedAt,
-        project.UpdatedAt,
-        project.PublishedAt);
+    private static ProjectDto MapToDto(Project project) => new()
+    {
+        Id = project.Id,
+        Title = project.Title,
+        Slug = project.Slug,
+        ShortDescription = project.ShortDescription,
+        ThumbnailUrl = project.ThumbnailUrl,
+        RepositoryUrl = project.RepositoryUrl,
+        DemoUrl = project.DemoUrl,
+        Status = project.Status,
+        IsFeatured = project.IsFeatured,
+        DisplayOrder = project.DisplayOrder,
+        StartedAt = project.StartedAt,
+        CompletedAt = project.CompletedAt,
+        CreatedAt = project.CreatedAt,
+        UpdatedAt = project.UpdatedAt,
+        PublishedAt = project.PublishedAt
+    };
 }

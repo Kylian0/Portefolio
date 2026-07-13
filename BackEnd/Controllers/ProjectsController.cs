@@ -12,9 +12,9 @@ public sealed class ProjectsController(
     ILogger<ProjectsController> logger) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<ProjectReadDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<IReadOnlyList<ProjectDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IReadOnlyList<ProjectReadDto>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<ProjectDto>>> GetAll(CancellationToken cancellationToken)
     {
         try
         {
@@ -36,10 +36,10 @@ public sealed class ProjectsController(
     }
 
     [HttpGet("{id}")]
-    [ProducesResponseType<ProjectReadDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProjectDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ProjectReadDto>> GetById(uint id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ProjectDto>> GetById(uint id, CancellationToken cancellationToken)
     {
         try
         {
@@ -69,12 +69,12 @@ public sealed class ProjectsController(
     }
 
     [HttpPost]
-    [ProducesResponseType<ProjectReadDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProjectDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ProjectReadDto>> Create(
-        [FromBody] ProjectCreateDto request,
+    public async Task<ActionResult<ProjectDto>> Create(
+        [FromBody] ProjectDto request,
         CancellationToken cancellationToken)
     {
         try
@@ -104,14 +104,14 @@ public sealed class ProjectsController(
     }
 
     [HttpPut("{id}")]
-    [ProducesResponseType<ProjectReadDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProjectDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ProjectReadDto>> Update(
+    public async Task<ActionResult<ProjectDto>> Update(
         uint id,
-        [FromBody] ProjectUpdateDto request,
+        [FromBody] ProjectDto request,
         CancellationToken cancellationToken)
     {
         try

@@ -19,6 +19,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddScoped<IProjectRepository, MySqlProjectRepository>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IProjectDocumentRepository, MySqlProjectDocumentRepository>();
+builder.Services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
 
 var app = builder.Build();
 
