@@ -34,6 +34,7 @@ services:
       DOTNET_ENVIRONMENT: Development
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      ConnectionStrings__PortfolioDatabase: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-portfolio_db};User ID=${MYSQL_USER:-portfolio_dev};Password=${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD dans le fichier .env}"
     ports:
       - "${BACKEND_PORT:-5097}:5097"
     volumes:
@@ -49,7 +50,7 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Définissez MYSQL_ROOT_PASSWORD dans le fichier .env}"
-      MYSQL_DATABASE: "${MYSQL_DATABASE:-portfolio_dev}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-portfolio_db}"
       MYSQL_USER: "${MYSQL_USER:-portfolio_dev}"
       MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD dans le fichier .env}"
     ports:

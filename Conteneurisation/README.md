@@ -40,6 +40,7 @@ docker compose down --volumes
 
 - Front-end : http://localhost:5200
 - Back-end : http://localhost:5097
+- Swagger UI : http://localhost:5097/swagger
 - Documentation OpenAPI du back-end en développement : http://localhost:5097/openapi/v1.json
 - phpMyAdmin : http://localhost:8081
 - MySQL depuis la machine hôte : `localhost:3307`
