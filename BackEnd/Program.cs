@@ -19,6 +19,11 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddScoped<Project>();
 builder.Services.AddScoped<ProjectDocument>();
 builder.Services.AddScoped<ProjectDocumentBlock>();
+builder.Services.AddScoped<Media>();
+builder.Services.AddScoped<TechnologyCategory>();
+builder.Services.AddScoped<Technology>();
+builder.Services.AddScoped<ProjectTechnology>();
+builder.Services.AddScoped<ProjectLearning>();
 
 var app = builder.Build();
 
