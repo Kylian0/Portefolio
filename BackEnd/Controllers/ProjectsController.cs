@@ -1,6 +1,6 @@
 using BackEnd.Dtos;
 using BackEnd.Exceptions;
-using BackEnd.Services;
+using BackEnd.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BackEnd.Controllers;
@@ -8,7 +8,7 @@ namespace BackEnd.Controllers;
 [ApiController]
 [Route("api/projects")]
 public sealed class ProjectsController(
-    IProjectService projectService,
+    Project projectModel,
     ILogger<ProjectsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -18,8 +18,8 @@ public sealed class ProjectsController(
     {
         try
         {
-            var projects = await projectService.GetAllAsync(cancellationToken);
-            return Ok(projects);
+            var projects = await projectModel.GetAllAsync(cancellationToken);
+            return Ok(projects.Select(Map).ToArray());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -43,7 +43,8 @@ public sealed class ProjectsController(
     {
         try
         {
-            var project = await projectService.GetByIdAsync(id, cancellationToken);
+            var entity = await projectModel.GetByIdAsync(id, cancellationToken);
+            var project = entity is null ? null : Map(entity);
             if (project is null)
             {
                 return Problem(
@@ -79,7 +80,7 @@ public sealed class ProjectsController(
     {
         try
         {
-            var project = await projectService.CreateAsync(request, cancellationToken);
+            var project = Map(await projectModel.CreateAsync(ToEntity(request), cancellationToken));
             return CreatedAtAction(nameof(GetById), new { id = project.Id }, project);
         }
         catch (ProjectSlugConflictException)
@@ -116,7 +117,8 @@ public sealed class ProjectsController(
     {
         try
         {
-            var project = await projectService.UpdateAsync(id, request, cancellationToken);
+            var entity = await projectModel.UpdateAsync(id, ToEntity(request, id), cancellationToken);
+            var project = entity is null ? null : Map(entity);
             if (project is null)
             {
                 return Problem(
@@ -156,7 +158,7 @@ public sealed class ProjectsController(
     {
         try
         {
-            if (!await projectService.DeleteAsync(id, cancellationToken))
+            if (!await projectModel.DeleteAsync(id, cancellationToken))
             {
                 return Problem(
                     statusCode: StatusCodes.Status404NotFound,
@@ -179,4 +181,40 @@ public sealed class ProjectsController(
                 detail: "An unexpected error occurred while processing the request.");
         }
     }
+
+    private static Project ToEntity(ProjectDto project, uint id = 0) => new()
+    {
+        Id = id,
+        Title = project.Title.Trim(),
+        Slug = project.Slug.Trim(),
+        ShortDescription = project.ShortDescription.Trim(),
+        ThumbnailUrl = project.ThumbnailUrl,
+        RepositoryUrl = project.RepositoryUrl,
+        DemoUrl = project.DemoUrl,
+        Status = project.Status,
+        IsFeatured = project.IsFeatured,
+        DisplayOrder = project.DisplayOrder,
+        StartedAt = project.StartedAt,
+        CompletedAt = project.CompletedAt,
+        PublishedAt = project.PublishedAt
+    };
+
+    private static ProjectDto Map(Project project) => new()
+    {
+        Id = project.Id,
+        Title = project.Title,
+        Slug = project.Slug,
+        ShortDescription = project.ShortDescription,
+        ThumbnailUrl = project.ThumbnailUrl,
+        RepositoryUrl = project.RepositoryUrl,
+        DemoUrl = project.DemoUrl,
+        Status = project.Status,
+        IsFeatured = project.IsFeatured,
+        DisplayOrder = project.DisplayOrder,
+        StartedAt = project.StartedAt,
+        CompletedAt = project.CompletedAt,
+        CreatedAt = project.CreatedAt,
+        UpdatedAt = project.UpdatedAt,
+        PublishedAt = project.PublishedAt
+    };
 }

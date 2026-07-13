@@ -1,5 +1,4 @@
-using BackEnd.Repositories;
-using BackEnd.Services;
+using BackEnd.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,10 +16,9 @@ builder.Services.AddSwaggerGen(options =>
         Description = "API du portfolio de Kylian."
     });
 });
-builder.Services.AddScoped<IProjectRepository, MySqlProjectRepository>();
-builder.Services.AddScoped<IProjectService, ProjectService>();
-builder.Services.AddScoped<IProjectDocumentRepository, MySqlProjectDocumentRepository>();
-builder.Services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
+builder.Services.AddScoped<Project>();
+builder.Services.AddScoped<ProjectDocument>();
+builder.Services.AddScoped<ProjectDocumentBlock>();
 
 var app = builder.Build();
 
