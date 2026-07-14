@@ -9,7 +9,26 @@
     <div class="project-card__content">
         <h2>@Title</h2>
         <p>@Description</p>
-        @if (Technologies.Count > 0)
+        @if (ProjectTechnologies.Count > 0)
+        {
+            <ul class="project-card__technologies" aria-label="Technologies utilisées">
+                @foreach (var technology in ProjectTechnologies)
+                {
+                    <li class="@(technology.IsPrimary ? "project-card__technology--primary" : null)">
+                        @if (technology.IsPrimary)
+                        {
+                            <span class="project-card__primary-marker" title="Technologie principale" aria-label="Technologie principale">★</span>
+                        }
+                        <span>@GetTechnologyName(technology)</span>
+                        @if (!string.IsNullOrWhiteSpace(technology.CategoryName))
+                        {
+                            <small>@technology.CategoryName</small>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        else if (Technologies.Count > 0)
         {
             <ul class="project-card__technologies" aria-label="Technologies utilisées">
                 @foreach (var technology in Technologies)
@@ -17,6 +36,10 @@
                     <li>@technology</li>
                 }
             </ul>
+        }
+        @if (TechnologyLoadFailed)
+        {
+            <small class="project-card__technology-error" role="status">Technologies temporairement indisponibles.</small>
         }
         <a class="project-card__link" href="@DetailUrl" aria-label="Découvrir le projet @Title">
             Voir la documentation <span aria-hidden="true">→</span>
@@ -47,5 +70,14 @@
     public IReadOnlyList<string> Technologies { get; set; } = [];
 
     [Parameter]
+    public IReadOnlyList<ProjectTechnologyApiDto> ProjectTechnologies { get; set; } = [];
+
+    [Parameter]
+    public bool TechnologyLoadFailed { get; set; }
+
+    [Parameter]
     public string? Variant { get; set; }
+
+    private static string GetTechnologyName(ProjectTechnologyApiDto technology) =>
+        string.IsNullOrWhiteSpace(technology.TechnologyName) ? "Technologie non renseignée" : technology.TechnologyName;
 }

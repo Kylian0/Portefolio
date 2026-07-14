@@ -1,0 +1,67 @@
+@inject IConfiguration Configuration
+
+@if (ResolvedUrl is null || loadFailed)
+{
+    <p class="document-block-invalid">Le média « @Media.OriginalFilename » est indisponible.</p>
+}
+else
+{
+    switch (Media.MediaType)
+    {
+        case "image":
+            <figure class="document-media">
+                <img src="@ResolvedUrl" alt="@(Media.AltText ?? string.Empty)" loading="lazy" @onerror="HandleLoadError" />
+                @if (!string.IsNullOrWhiteSpace(Media.Caption))
+                {
+                    <figcaption>@Media.Caption</figcaption>
+                }
+            </figure>
+            break;
+        case "video":
+            if (CanUseNativeVideo)
+            {
+                <div class="document-video document-video--native">
+                    <video controls preload="metadata" @onerror="HandleLoadError">
+                        <source src="@ResolvedUrl" type="@Media.MimeType" />
+                        Votre navigateur ne peut pas lire cette vidéo.
+                    </video>
+                </div>
+            }
+            else
+            {
+                <a class="document-media-link" href="@ResolvedUrl" target="_blank" rel="noopener noreferrer">Ouvrir la vidéo « @Media.OriginalFilename »</a>
+            }
+            break;
+        case "document":
+            <a class="document-media-link" href="@ResolvedUrl" target="_blank" rel="noopener noreferrer" download="@Media.OriginalFilename">Ouvrir le document « @Media.OriginalFilename »</a>
+            break;
+        default:
+            <p class="document-block-invalid">Type de média non pris en charge : @Media.MediaType</p>
+            break;
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public MediaApiDto Media { get; set; } = new();
+
+    private bool loadFailed;
+    private string? ResolvedUrl => ResolveUrl(Media.PublicUrl) ?? ResolveUrl(Media.FilePath);
+    private bool CanUseNativeVideo => Media.MimeType is "video/mp4" or "video/webm" or "video/ogg";
+
+    protected override void OnParametersSet() => loadFailed = false;
+
+    private void HandleLoadError() => loadFailed = true;
+
+    private string? ResolveUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+        {
+            return absolute.Scheme is "http" or "https" ? absolute.ToString() : null;
+        }
+
+        var baseUrl = Configuration["Api:BaseUrl"];
+        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var apiBase) ? new Uri(apiBase, value).ToString() : null;
+    }
+}

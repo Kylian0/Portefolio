@@ -1,6 +1,6 @@
 @page "/projects/{Slug}"
-@using FrontEnd.Services
 @inject IAdminAccessService AdminAccess
+@inject IProjectDocumentationService DocumentationService
 @inject NavigationManager Navigation
 
 <PageTitle>@ProjectTitle | Portfolio</PageTitle>
@@ -13,103 +13,132 @@
             {
                 <div class="project-document__admin-bar">
                     <span>Mode administration</span>
-                    <button type="button" @onclick="ShowEditMessage">Modifier</button>
+                    <button type="button" @onclick="ToggleEditMode">@(editMode ? "Fermer l’éditeur" : "Modifier")</button>
                 </div>
-                @if (showEditMessage)
+            }
+
+            @if (data?.Project is { } project)
+            {
+                <p class="project-document__category">@(data.Document?.Title ?? "Étude de cas")</p>
+                <h1>@project.Title</h1>
+                <p class="project-document__lead">@project.ShortDescription</p>
+                <dl class="project-document__metadata">
+                    <div><dt>Projet de</dt><dd>Kylian</dd></div>
+                    <div><dt>Statut</dt><dd>@GetStatusLabel(project.Status)</dd></div>
+                    <div><dt>Année</dt><dd>@GetProjectYear(project)</dd></div>
+                </dl>
+                @if (data.Technologies.Count > 0)
                 {
-                    <p class="project-document__admin-message" role="status">L'éditeur de documentation sera disponible dans une prochaine version.</p>
+                    <div class="project-document__technology-section">
+                        <h2>Technologies</h2>
+                        <ul class="project-document__technologies" aria-label="Technologies du projet">
+                            @foreach (var technology in data.Technologies)
+                            {
+                                <li class="@(technology.IsPrimary ? "project-document__technology--primary" : null)">
+                                    @if (technology.IsPrimary)
+                                    {
+                                        <span aria-hidden="true">★</span>
+                                    }
+                                    <strong>@GetTechnologyName(technology)</strong>
+                                    @if (!string.IsNullOrWhiteSpace(technology.CategoryName))
+                                    {
+                                        <small>@technology.CategoryName</small>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                else if (data.TechnologyLoadFailed)
+                {
+                    <p class="project-document__technology-error" role="status">Les technologies sont temporairement indisponibles.</p>
                 }
             }
-            <p class="project-document__category">Étude de cas</p>
-            <h1>@ProjectTitle</h1>
-            <p class="project-document__lead">
-                Cette documentation de démonstration illustre la manière dont je souhaite présenter mes réalisations,
-                mes choix techniques, les problèmes rencontrés et ce que chaque projet m'a permis d'apprendre.
-            </p>
-            <dl class="project-document__metadata">
-                <div>
-                    <dt>Projet de</dt>
-                    <dd>Kylian</dd>
-                </div>
-                <div>
-                    <dt>Technologies</dt>
-                    <dd>Blazor, ASP.NET Core</dd>
-                </div>
-                <div>
-                    <dt>Année</dt>
-                    <dd>2026</dd>
-                </div>
-            </dl>
+            else
+            {
+                <p class="project-document__category">Documentation</p>
+                <h1>@ProjectTitle</h1>
+            }
         </header>
 
-        <figure class="document-media">
-            <img src="images/project-placeholder.svg" alt="Aperçu temporaire de l'interface du projet" />
-            <figcaption>Aperçu de l'interface principale — image de démonstration.</figcaption>
-        </figure>
+        @if (isLoading)
+        {
+            <section class="project-document__state" aria-live="polite">
+                <h2>Chargement de la documentation…</h2>
+                <p>Le contenu du projet est en cours de récupération.</p>
+            </section>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <section class="project-document__state" role="alert">
+                <h2>Documentation indisponible</h2>
+                <p>@errorMessage</p>
+                <button type="button" @onclick="LoadDocumentationAsync">Réessayer</button>
+            </section>
+        }
+        else if (data?.Project is null)
+        {
+            <section class="project-document__state">
+                <h2>Projet introuvable</h2>
+                <p>Ce projet n’existe pas ou n’est plus disponible.</p>
+            </section>
+        }
+        else if (AdminMode && AdminAccess.IsAuthenticated && editMode)
+        {
+            <ProjectDocumentationEditor Data="data" OnChanged="LoadDocumentationAsync" />
+        }
+        else if (data.Document is null)
+        {
+            <section class="project-document__state">
+                <h2>Aucune documentation disponible</h2>
+                <p>La documentation de ce projet sera publiée prochainement.</p>
+            </section>
+        }
+        else if (data.Blocks.Count == 0)
+        {
+            <section class="project-document__state">
+                <h2>Documentation vide</h2>
+                <p>Le document existe, mais aucun contenu n’a encore été ajouté.</p>
+            </section>
+        }
+        else
+        {
+            @foreach (var block in data.Blocks)
+            {
+                <ProjectDocumentBlockRenderer Block="@block" Media="@data.Media" @key="block.Id" />
+            }
+        }
 
-        <section aria-labelledby="context-title">
-            <h2 id="context-title">Contexte et objectifs</h2>
-            <p>
-                Le projet répond à un besoin courant : retrouver rapidement une information utile sans naviguer
-                entre plusieurs outils. La première étape a consisté à identifier les actions essentielles et à
-                réduire le nombre d'étapes nécessaires pour les accomplir.
-            </p>
-            <p>
-                Cette documentation présente les choix réalisés, les principales fonctionnalités et les enseignements
-                tirés du développement. Son contenu reste temporaire en attendant les informations propres au projet.
-            </p>
-        </section>
+        @if (!isLoading && string.IsNullOrEmpty(errorMessage) && data?.Learnings.Count > 0)
+        {
+            <section class="project-learnings" aria-labelledby="project-learnings-title">
+                <p class="project-document__category">Retour d’expérience</p>
+                <h2 id="project-learnings-title">Ce que j’ai appris</h2>
+                <ul>
+                    @foreach (var learning in data.Learnings)
+                    {
+                        <li @key="learning.Id">@learning.Content</li>
+                    }
+                </ul>
+            </section>
+        }
+        else if (!isLoading && string.IsNullOrEmpty(errorMessage) && data?.LearningLoadFailed == true)
+        {
+            <p class="project-learnings__error" role="status">Les apprentissages sont temporairement indisponibles.</p>
+        }
 
-        <section aria-labelledby="features-title">
-            <h2 id="features-title">Fonctionnalités principales</h2>
-            <p>La première version se concentre volontairement sur un périmètre limité :</p>
-            <ul>
-                <li>création et organisation rapide des éléments ;</li>
-                <li>recherche et filtrage des informations ;</li>
-                <li>interface responsive adaptée aux ordinateurs et appareils mobiles ;</li>
-                <li>retours visuels clairs pour chaque action utilisateur.</li>
-            </ul>
-        </section>
-
-        <section aria-labelledby="approach-title">
-            <h2 id="approach-title">Approche technique</h2>
-            <p>
-                L'interface est découpée en composants ciblés et réutilisables. Les données de présentation restent
-                séparées du rendu afin de faciliter leur remplacement futur par une API.
-            </p>
-            <pre><code>public sealed record Project(
-    string Title,
-    string Description,
-    string Slug);</code></pre>
-            <p>
-                Cet exemple illustre une structure volontairement simple pour représenter un projet sans ajouter
-                de dépendance ou de couche superflue.
-            </p>
-        </section>
-
-        <section aria-labelledby="video-title">
-            <h2 id="video-title">Démonstration vidéo</h2>
-            <p>Une vidéo de présentation pourra être intégrée directement dans le document.</p>
-            <div class="document-video">
-                <iframe src="https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ"
-                        title="Vidéo de démonstration du projet"
-                        loading="lazy"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowfullscreen></iframe>
-            </div>
-        </section>
-
-        <section aria-labelledby="outcome-title">
-            <h2 id="outcome-title">Résultat et apprentissages</h2>
-            <p>
-                Cette première réalisation fournit une base cohérente et maintenable. Les prochaines itérations
-                pourront introduire la persistance des données, l'authentification et des outils de collaboration,
-                après validation des besoins réels des utilisateurs.
-            </p>
-            <blockquote>
-                Une interface réussie rend les actions importantes évidentes et laisse la complexité en arrière-plan.
-            </blockquote>
-        </section>
+        @if (!isLoading && string.IsNullOrEmpty(errorMessage) && data?.Project is not null && data.Media.Count > 0)
+        {
+            <section class="project-media-section" aria-labelledby="project-media-title">
+                <h2 id="project-media-title">Médias du projet</h2>
+                <div class="document-gallery">
+                    @foreach (var media in data.Media)
+                    {
+                        <ProjectMediaRenderer Media="@media" @key="media.Id" />
+                    }
+                </div>
+            </section>
+        }
     </article>
 </main>
 
@@ -120,24 +149,55 @@
     [SupplyParameterFromQuery(Name = "admin")]
     public bool AdminMode { get; set; }
 
-    private bool showEditMessage;
+    private ProjectDocumentationData? data;
+    private bool isLoading = true;
+    private bool editMode;
+    private string? errorMessage;
 
-    protected override void OnParametersSet()
+    private string ProjectTitle => data?.Project?.Title ?? "Présentation du projet";
+
+    protected override async Task OnParametersSetAsync()
     {
         if (AdminMode && !AdminAccess.IsAuthenticated)
         {
             Navigation.NavigateTo("/admin/login", replace: true);
+            return;
+        }
+
+        await LoadDocumentationAsync();
+    }
+
+    private async Task LoadDocumentationAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            data = await DocumentationService.GetByProjectSlugAsync(Slug);
+        }
+        catch (Exception)
+        {
+            errorMessage = "Vérifiez que l'API est démarrée, puis réessayez.";
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
-    private void ShowEditMessage() => showEditMessage = true;
+    private void ToggleEditMode() => editMode = !editMode;
 
-    private string ProjectTitle => Slug switch
+    private static string GetStatusLabel(string status) => status switch
     {
-        "gestionnaire-taches" => "Gestionnaire de tâches",
-        "tableau-de-bord" => "Tableau de bord analytique",
-        "catalogue-interactif" => "Catalogue interactif",
-        "api-reservation" => "API de réservation",
-        _ => "Présentation du projet"
+        "published" => "Publié",
+        "draft" => "Brouillon",
+        "archived" => "Archivé",
+        _ => status
     };
+
+    private static int GetProjectYear(ProjectApiDto project) =>
+        project.StartedAt?.Year ?? project.PublishedAt?.Year ?? project.CreatedAt.Year;
+
+    private static string GetTechnologyName(ProjectTechnologyApiDto technology) =>
+        string.IsNullOrWhiteSpace(technology.TechnologyName) ? "Technologie non renseignée" : technology.TechnologyName;
 }

@@ -1,21 +1,36 @@
 @using FrontEnd.Models
 
 <button class="admin-project-card" type="button" @onclick="() => OnSelected.InvokeAsync(Project)">
-    <img src="@Project.ImageUrl" alt="Aperçu du projet @Project.Name" />
+    <img src="@(string.IsNullOrWhiteSpace(Project.ThumbnailUrl) ? "images/project-placeholder.svg" : Project.ThumbnailUrl)" alt="Aperçu du projet @Project.Title" />
     <span class="admin-project-card__body">
-        <span class="admin-project-card__type">@Project.Type</span>
-        <strong>@Project.Name</strong>
-        <span class="admin-project-card__description">@Project.Description</span>
-        <span class="admin-project-card__technologies">
-            @foreach (var technology in Project.Technologies)
-            {
-                <span>@technology</span>
-            }
+        <span class="admin-project-card__heading">
+            <span class="admin-project-card__type admin-project-card__status--@Project.Status">@GetStatusLabel(Project.Status)</span>
+            @if (Project.IsFeatured) { <span class="admin-project-card__featured">Mis en avant</span> }
         </span>
+        <strong>@Project.Title</strong>
+        <span class="admin-project-card__description">@Project.ShortDescription</span>
+        @if (Technologies.Count > 0)
+        {
+            <span class="admin-project-card__technologies">
+                @foreach (var technology in Technologies)
+                {
+                    <span>@technology.TechnologyName</span>
+                }
+            </span>
+        }
     </span>
 </button>
 
 @code {
-    [Parameter, EditorRequired] public AdminProject Project { get; set; } = default!;
-    [Parameter] public EventCallback<AdminProject> OnSelected { get; set; }
+    [Parameter, EditorRequired] public ProjectApiDto Project { get; set; } = default!;
+    [Parameter] public IReadOnlyList<ProjectTechnologyApiDto> Technologies { get; set; } = [];
+    [Parameter] public EventCallback<ProjectApiDto> OnSelected { get; set; }
+
+    private static string GetStatusLabel(string status) => status switch
+    {
+        "draft" => "Brouillon",
+        "published" => "Publié",
+        "archived" => "Archivé",
+        _ => status
+    };
 }

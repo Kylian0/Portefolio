@@ -1,4 +1,6 @@
 @page "/projects"
+@inject IProjectApiService ProjectApiService
+@inject IProjectTechnologyApiService TechnologyApiService
 
 <PageTitle>Projets | Portfolio</PageTitle>
 
@@ -17,103 +19,295 @@
     <section class="projects-toolbar" aria-label="Recherche et filtres des projets">
         <label class="projects-search">
             <span class="visually-hidden">Rechercher un projet</span>
-            <input type="search" placeholder="Rechercher un projet…" @bind="searchTerm" @bind:event="oninput" />
+            <input type="search" placeholder="Rechercher un projet…" @bind="searchTerm" @bind:event="oninput" disabled="@isLoading" />
         </label>
 
-        <div class="projects-filters">
-            <label>
-                <span>Type</span>
-                <select @bind="selectedType">
-                    <option value="">Tous</option>
-                    @foreach (var type in projectTypes) { <option value="@type">@type</option> }
-                </select>
-            </label>
-            <label>
-                <span>Langage</span>
-                <select @bind="selectedLanguage">
-                    <option value="">Tous</option>
-                    @foreach (var language in languages) { <option value="@language">@language</option> }
-                </select>
-            </label>
-            <label>
-                <span>Technologie</span>
-                <select @bind="selectedTechnology">
-                    <option value="">Toutes</option>
-                    @foreach (var technology in technologies) { <option value="@technology">@technology</option> }
-                </select>
-            </label>
-        </div>
+        <button type="button"
+                class="projects-filter-toggle"
+                aria-expanded="@filtersOpen"
+                aria-controls="public-project-filters"
+                disabled="@isLoading"
+                @onclick="ToggleFiltersPanel">
+            Filtres
+            @if (ActiveFilterCount > 0)
+            {
+                <span aria-label="@($"{ActiveFilterCount} filtre(s) actif(s)")">@ActiveFilterCount</span>
+            }
+        </button>
     </section>
 
-    <div class="projects-results">
-        <p><strong>@FilteredProjects.Count</strong> projet(s)</p>
-        @if (HasActiveFilters)
-        {
-            <button type="button" @onclick="ResetFilters">Réinitialiser</button>
-        }
-    </div>
-
-    @if (FilteredProjects.Count > 0)
+    @if (filtersOpen)
     {
-        <section class="projects-grid" aria-label="Liste des projets">
-            @foreach (var project in FilteredProjects)
-            {
-                <ProjectCard Title="@project.Title"
-                             Description="@project.Description"
-                             DetailUrl="@project.DetailUrl"
-                             Category="@project.Type"
-                             Technologies="@project.AllTechnologies"
-                             Variant="gallery"
-                             ImageAlt="@($"Aperçu temporaire du projet {project.Title}")" />
-            }
+        <section id="public-project-filters" class="projects-filter-panel" aria-label="Filtres par technologies">
+            <header>
+                <div>
+                    <strong>Filtrer par technologie</strong>
+                    <p>Sélectionnez une catégorie entière ou des technologies précises.</p>
+                </div>
+                @if (ActiveFilterCount > 0)
+                {
+                    <button type="button" @onclick="ClearTechnologyFilters">Tout effacer</button>
+                }
+            </header>
+
+            <div class="projects-filter-groups">
+                @foreach (var category in technologyCategories.OrderBy(item => item.DisplayOrder).ThenBy(item => item.Name))
+                {
+                    var categoryTechnologies = GetTechnologiesForCategory(category.Id);
+                    var expanded = expandedCategoryIds.Contains(category.Id);
+                    <section class="projects-filter-group">
+                        <button type="button"
+                                class="projects-filter-group__toggle"
+                                aria-expanded="@expanded"
+                                @onclick="() => ToggleCategory(category.Id)">
+                            <span>@GetCategoryName(category)</span>
+                            <small>@categoryTechnologies.Count</small>
+                            <span aria-hidden="true">@(expanded ? "−" : "+")</span>
+                        </button>
+                        @if (expanded)
+                        {
+                            <div class="projects-filter-group__options">
+                                <label class="projects-filter-group__all">
+                                    <input type="checkbox"
+                                           checked="@selectedCategoryIds.Contains(category.Id)"
+                                           @onchange="args => ToggleId(selectedCategoryIds, category.Id, args)" />
+                                    <span>Toute la catégorie</span>
+                                </label>
+                                @if (categoryTechnologies.Count > 0)
+                                {
+                                    @foreach (var technology in categoryTechnologies)
+                                    {
+                                        <label>
+                                            <input type="checkbox"
+                                                   checked="@selectedTechnologyIds.Contains(technology.Id)"
+                                                   @onchange="args => ToggleId(selectedTechnologyIds, technology.Id, args)" />
+                                            <span>@GetTechnologyName(technology)</span>
+                                        </label>
+                                    }
+                                }
+                                else
+                                {
+                                    <p>Aucune technologie dans cette catégorie.</p>
+                                }
+                            </div>
+                        }
+                    </section>
+                }
+            </div>
+
+            <label class="projects-primary-filter">
+                <input type="checkbox" @bind="primaryOnly" />
+                <span>Afficher uniquement les projets utilisant une technologie principale correspondante</span>
+            </label>
+        </section>
+    }
+
+    @if (isLoading)
+    {
+        <section class="projects-state" aria-live="polite">
+            <strong>Chargement des projets…</strong>
+            <p>Les réalisations sont en cours de récupération.</p>
+        </section>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <section class="projects-state projects-state--error" role="alert">
+            <strong>Impossible de charger les projets</strong>
+            <p>@errorMessage</p>
+            <button type="button" @onclick="LoadProjectsAsync">Réessayer</button>
         </section>
     }
     else
     {
-        <section class="projects-empty">
-            <strong>Aucun projet trouvé</strong>
-            <p>Essayez de modifier votre recherche ou de réinitialiser les filtres.</p>
-            <button type="button" @onclick="ResetFilters">Réinitialiser les filtres</button>
-        </section>
+        <div class="projects-results">
+            <p><strong>@FilteredProjects.Count</strong> projet(s)</p>
+            @if (HasActiveFilters)
+            {
+                <button type="button" @onclick="ResetFilters">Réinitialiser</button>
+            }
+        </div>
+
+        @if (technologyCatalogLoadFailed || technologyLoadFailures.Count > 0)
+        {
+            <p class="projects-technology-warning" role="status">
+                Certaines technologies n'ont pas pu être chargées. Les projets concernés restent visibles.
+            </p>
+        }
+
+        @if (FilteredProjects.Count > 0)
+        {
+            <section class="projects-grid" aria-label="Liste des projets">
+                @foreach (var project in FilteredProjects)
+                {
+                    <ProjectCard Title="@project.Title"
+                                 Description="@project.ShortDescription"
+                                 DetailUrl="@($"/projects/{project.Slug}")"
+                                 ImageUrl="@(string.IsNullOrWhiteSpace(project.ThumbnailUrl) ? PlaceholderImage : project.ThumbnailUrl)"
+                                 Variant="gallery"
+                                 ProjectTechnologies="@GetTechnologies(project.Id)"
+                                 TechnologyLoadFailed="@technologyLoadFailures.Contains(project.Id)"
+                                 ImageAlt="@($"Aperçu du projet {project.Title}")" />
+                }
+            </section>
+        }
+        else
+        {
+            <section class="projects-empty">
+                <strong>@(projects.Count == 0 ? "Aucun projet publié" : "Aucun projet trouvé")</strong>
+                <p>@(projects.Count == 0 ? "Les projets publiés apparaîtront prochainement ici." : "Essayez de modifier votre recherche.")</p>
+                @if (HasActiveFilters)
+                {
+                    <button type="button" @onclick="ResetFilters">Réinitialiser la recherche</button>
+                }
+            </section>
+        }
     }
 </main>
 
 @code {
+    private const string PlaceholderImage = "images/project-placeholder.svg";
+    private readonly List<ProjectApiDto> projects = [];
+    private readonly List<TechnologyCategoryApiDto> technologyCategories = [];
+    private readonly List<TechnologyApiDto> technologyCatalog = [];
+    private readonly Dictionary<uint, IReadOnlyList<ProjectTechnologyApiDto>> technologiesByProject = [];
+    private readonly HashSet<uint> technologyLoadFailures = [];
     private string searchTerm = string.Empty;
-    private string selectedType = string.Empty;
-    private string selectedLanguage = string.Empty;
-    private string selectedTechnology = string.Empty;
+    private readonly HashSet<uint> selectedCategoryIds = [];
+    private readonly HashSet<uint> selectedTechnologyIds = [];
+    private readonly HashSet<uint> expandedCategoryIds = [];
+    private bool primaryOnly;
+    private bool filtersOpen;
+    private bool technologyCatalogLoadFailed;
+    private string? errorMessage;
+    private bool isLoading = true;
 
-    private readonly string[] projectTypes = ["Web", "Mobile", "Jeu vidéo"];
-    private readonly string[] languages = ["C#", "C++", "Java"];
-    private readonly string[] technologies = ["Blazor", "ASP.NET Core", ".NET MAUI", "Unity", "Unreal Engine"];
+    private List<ProjectApiDto> FilteredProjects => projects.Where(MatchesFilters).ToList();
 
-    private readonly ProjectPreview[] projects =
-    [
-        new("Gestionnaire de tâches", "Une application web permettant d'organiser ses tâches, ses priorités et son avancement.", "/projects/gestionnaire-taches", "Web", ["C#"], ["Blazor", "ASP.NET Core"]),
-        new("Tableau de bord analytique", "Une interface claire pour consulter des indicateurs et suivre leur évolution.", "/projects/tableau-de-bord", "Web", ["C#"], ["Blazor"]),
-        new("Catalogue interactif", "Une expérience mobile de consultation fluide avec recherche et filtrage de contenus.", "/projects/catalogue-interactif", "Mobile", ["C#"], [".NET MAUI"]),
-        new("API de réservation", "Un service conçu pour gérer des disponibilités et des demandes de réservation.", "/projects/api-reservation", "Web", ["C#"], ["ASP.NET Core"])
-    ];
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchTerm) ||
+        selectedCategoryIds.Count > 0 || selectedTechnologyIds.Count > 0 || primaryOnly;
 
-    private List<ProjectPreview> FilteredProjects => projects.Where(project =>
-        (string.IsNullOrWhiteSpace(searchTerm) || project.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
-        (string.IsNullOrEmpty(selectedType) || project.Type == selectedType) &&
-        (string.IsNullOrEmpty(selectedLanguage) || project.Languages.Contains(selectedLanguage)) &&
-        (string.IsNullOrEmpty(selectedTechnology) || project.Technologies.Contains(selectedTechnology))).ToList();
+    private int ActiveFilterCount => selectedCategoryIds.Count + selectedTechnologyIds.Count + (primaryOnly ? 1 : 0);
 
-    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchTerm) || !string.IsNullOrEmpty(selectedType) || !string.IsNullOrEmpty(selectedLanguage) || !string.IsNullOrEmpty(selectedTechnology);
+    protected override Task OnInitializedAsync() => LoadProjectsAsync();
+
+    private async Task LoadProjectsAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        technologiesByProject.Clear();
+        technologyLoadFailures.Clear();
+        technologyCategories.Clear();
+        technologyCatalog.Clear();
+        technologyCatalogLoadFailed = false;
+
+        try
+        {
+            var projectsRequest = ProjectApiService.GetAllAsync();
+            var catalogRequest = LoadTechnologyCatalogAsync();
+
+            var apiProjects = await projectsRequest;
+            projects.Clear();
+            projects.AddRange(apiProjects.Where(project =>
+                string.Equals(project.Status, "published", StringComparison.OrdinalIgnoreCase)));
+            await catalogRequest;
+            await Task.WhenAll(projects.Select(LoadTechnologiesAsync));
+        }
+        catch (Exception)
+        {
+            errorMessage = "Vérifiez que l'API est démarrée, puis réessayez.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadTechnologyCatalogAsync()
+    {
+        try
+        {
+            var categoriesRequest = TechnologyApiService.GetCategoriesAsync();
+            var technologiesRequest = TechnologyApiService.GetAllAsync();
+            await Task.WhenAll(categoriesRequest, technologiesRequest);
+            technologyCategories.AddRange(await categoriesRequest);
+            technologyCatalog.AddRange(await technologiesRequest);
+        }
+        catch
+        {
+            technologyCatalogLoadFailed = true;
+        }
+    }
+
+    private async Task LoadTechnologiesAsync(ProjectApiDto project)
+    {
+        try
+        {
+            technologiesByProject[project.Id] = await TechnologyApiService.GetByProjectIdAsync(project.Id);
+        }
+        catch
+        {
+            technologiesByProject[project.Id] = [];
+            technologyLoadFailures.Add(project.Id);
+        }
+    }
+
+    private IReadOnlyList<ProjectTechnologyApiDto> GetTechnologies(uint projectId) =>
+        technologiesByProject.GetValueOrDefault(projectId) ?? [];
+
+    private bool MatchesFilters(ProjectApiDto project)
+    {
+        var technologies = GetTechnologies(project.Id);
+        var matchesSearch = string.IsNullOrWhiteSpace(searchTerm) ||
+            project.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            project.ShortDescription.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            technologies.Any(item =>
+                Contains(item.TechnologyName, searchTerm) || Contains(item.CategoryName, searchTerm));
+        var hasTechnologyFilter = selectedCategoryIds.Count > 0 || selectedTechnologyIds.Count > 0 || primaryOnly;
+        var hasCatalogSelection = selectedCategoryIds.Count > 0 || selectedTechnologyIds.Count > 0;
+        var matchingTechnologies = technologies.Where(item =>
+            (!hasCatalogSelection || selectedCategoryIds.Contains(item.CategoryId) ||
+                selectedTechnologyIds.Contains(item.TechnologyId)) &&
+            (!primaryOnly || item.IsPrimary));
+
+        return matchesSearch && (!hasTechnologyFilter || matchingTechnologies.Any());
+    }
+
+    private static bool Contains(string? value, string term) =>
+        !string.IsNullOrWhiteSpace(value) && value.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private IReadOnlyList<TechnologyApiDto> GetTechnologiesForCategory(uint categoryId) => technologyCatalog
+        .Where(item => item.CategoryId == categoryId)
+        .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private static string GetCategoryName(TechnologyCategoryApiDto category) =>
+        string.IsNullOrWhiteSpace(category.Name) ? "Catégorie non renseignée" : category.Name;
+
+    private static string GetTechnologyName(TechnologyApiDto technology) =>
+        string.IsNullOrWhiteSpace(technology.Name) ? "Technologie non renseignée" : technology.Name;
+
+    private void ToggleFiltersPanel() => filtersOpen = !filtersOpen;
+
+    private void ToggleCategory(uint categoryId)
+    {
+        if (!expandedCategoryIds.Add(categoryId)) expandedCategoryIds.Remove(categoryId);
+    }
+
+    private static void ToggleId(HashSet<uint> target, uint id, ChangeEventArgs args)
+    {
+        if (args.Value is true) target.Add(id); else target.Remove(id);
+    }
+
+    private void ClearTechnologyFilters()
+    {
+        selectedCategoryIds.Clear();
+        selectedTechnologyIds.Clear();
+        primaryOnly = false;
+    }
 
     private void ResetFilters()
     {
         searchTerm = string.Empty;
-        selectedType = string.Empty;
-        selectedLanguage = string.Empty;
-        selectedTechnology = string.Empty;
-    }
-
-    private sealed record ProjectPreview(string Title, string Description, string DetailUrl, string Type, string[] Languages, string[] Technologies)
-    {
-        public IReadOnlyList<string> AllTechnologies => [.. Languages, .. Technologies];
+        ClearTechnologyFilters();
     }
 }

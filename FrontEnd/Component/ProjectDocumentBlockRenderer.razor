@@ -1,0 +1,313 @@
+@using System.Text.Json
+@inject IConfiguration Configuration
+
+<section class="document-block document-block--@Block.BlockType">
+    @try
+    {
+        switch (Block.BlockType)
+        {
+            case "rich_text":
+                <div class="document-rich-text" style="@BuildTextStyle()">@((MarkupString)(Block.Content ?? string.Empty))</div>
+                break;
+            case "heading":
+                @RenderHeading()
+                break;
+            case "image":
+                var imageReferences = GetReferencedMediaIds();
+                var imageMedia = GetReferencedMedia();
+                if (imageMedia is not null)
+                {
+                    <ProjectMediaRenderer Media="@imageMedia" />
+                }
+                else if (imageReferences.Count > 0)
+                {
+                    <p class="document-block-invalid">Le média référencé n’existe plus.</p>
+                }
+                else
+                {
+                    @RenderImage(Block.Content, GetSetting("alt"), GetSetting("caption"))
+                }
+                break;
+            case "gallery":
+                var galleryMedia = GetGalleryMedia();
+                var galleryImages = GetGalleryImages();
+                <div class="document-gallery">
+                    @foreach (var media in galleryMedia)
+                    {
+                        <ProjectMediaRenderer Media="@media" />
+                    }
+                    @foreach (var image in galleryImages)
+                    {
+                        @RenderImage(image.Url, image.Alt, image.Caption)
+                    }
+                    @if (galleryMedia.Count == 0 && galleryImages.Count == 0)
+                    {
+                        <p class="document-block-invalid">Aucun média de cette galerie n’est disponible.</p>
+                    }
+                </div>
+                break;
+            case "video":
+                var videoReferences = GetReferencedMediaIds();
+                var videoMedia = GetReferencedMedia();
+                if (videoMedia is not null)
+                {
+                    <ProjectMediaRenderer Media="@videoMedia" />
+                }
+                else if (videoReferences.Count > 0)
+                {
+                    <p class="document-block-invalid">Le média vidéo référencé n’existe plus.</p>
+                }
+                else
+                {
+                    @RenderVideo()
+                }
+                break;
+            case "code":
+                <div class="document-code">
+                    @if (!string.IsNullOrWhiteSpace(GetSetting("language")))
+                    {
+                        <span>@GetSetting("language")</span>
+                    }
+                    <pre><code>@Block.Content</code></pre>
+                </div>
+                break;
+            case "quote":
+                <blockquote>
+                    @Block.Content
+                    @if (!string.IsNullOrWhiteSpace(GetSetting("attribution")))
+                    {
+                        <footer>— @GetSetting("attribution")</footer>
+                    }
+                </blockquote>
+                break;
+            case "button":
+                var buttonUrl = ResolveUrl(GetSetting("url"));
+                if (buttonUrl is not null)
+                {
+                    <a class="document-button" href="@buttonUrl" target="@GetLinkTarget()" rel="noopener noreferrer">@(Block.Content ?? "Découvrir")</a>
+                }
+                else
+                {
+                    <p class="document-block-invalid">Lien indisponible.</p>
+                }
+                break;
+            case "separator":
+                <hr class="document-separator" />
+                break;
+            default:
+                <p class="document-block-invalid">Type de contenu non pris en charge : @Block.BlockType</p>
+                break;
+        }
+    }
+    catch
+    {
+        <p class="document-block-invalid">Ce bloc ne peut pas être affiché.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectDocumentBlockApiDto Block { get; set; } = new();
+
+    [Parameter]
+    public IReadOnlyList<MediaApiDto> Media { get; set; } = [];
+
+    private RenderFragment RenderHeading() => builder =>
+    {
+        var level = GetSetting("level") is { } value && int.TryParse(value, out var parsed)
+            ? Math.Clamp(parsed, 2, 4)
+            : 2;
+        builder.OpenElement(0, $"h{level}");
+        builder.AddContent(1, Block.Content);
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderImage(string? source, string? alt, string? caption) => builder =>
+    {
+        var url = ResolveUrl(source);
+        if (url is null)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "document-block-invalid");
+            builder.AddContent(2, "Image indisponible.");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(3, "figure");
+        builder.AddAttribute(4, "class", "document-media");
+        builder.OpenElement(5, "img");
+        builder.AddAttribute(6, "src", url);
+        builder.AddAttribute(7, "alt", alt ?? string.Empty);
+        builder.AddAttribute(8, "loading", "lazy");
+        builder.CloseElement();
+        if (!string.IsNullOrWhiteSpace(caption))
+        {
+            builder.OpenElement(9, "figcaption");
+            builder.AddContent(10, caption);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderVideo() => builder =>
+    {
+        var url = ResolveUrl(Block.Content);
+        if (url is null)
+        {
+            builder.AddContent(0, "Vidéo indisponible.");
+            return;
+        }
+
+        builder.OpenElement(1, "div");
+        builder.AddAttribute(2, "class", "document-video");
+        builder.OpenElement(3, "iframe");
+        builder.AddAttribute(4, "src", ToEmbedUrl(url));
+        builder.AddAttribute(5, "title", GetSetting("title") ?? "Vidéo du projet");
+        builder.AddAttribute(6, "loading", "lazy");
+        builder.AddAttribute(7, "allowfullscreen", true);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private string? GetSetting(string property)
+    {
+        if (string.IsNullOrWhiteSpace(Block.Settings)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(Block.Settings);
+            return document.RootElement.TryGetProperty(property, out var value)
+                ? value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private IReadOnlyList<GalleryImage> GetGalleryImages()
+    {
+        try
+        {
+            var json = GetSetting("images") ?? Block.Content;
+            if (string.IsNullOrWhiteSpace(json)) return [];
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Array) return [];
+            return document.RootElement.EnumerateArray().Select(item =>
+                item.ValueKind == JsonValueKind.String
+                    ? new GalleryImage(item.GetString(), null, null)
+                    : new GalleryImage(
+                        item.TryGetProperty("url", out var url) ? url.GetString() : null,
+                        item.TryGetProperty("alt", out var alt) ? alt.GetString() : null,
+                        item.TryGetProperty("caption", out var caption) ? caption.GetString() : null))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Url))
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private MediaApiDto? GetReferencedMedia()
+    {
+        var ids = GetReferencedMediaIds();
+        return ids.Select(id => Media.FirstOrDefault(item => item.Id == id)).FirstOrDefault(item => item is not null);
+    }
+
+    private IReadOnlyList<uint> GetReferencedMediaIds() => ParseMediaIds(Block.Settings)
+        .Concat(ParseMediaIds(Block.Content))
+        .Distinct()
+        .ToArray();
+
+    private IReadOnlyList<MediaApiDto> GetGalleryMedia() => ParseMediaIds(Block.Settings)
+        .Concat(ParseMediaIds(Block.Content))
+        .Distinct()
+        .Select(id => Media.FirstOrDefault(item => item.Id == id))
+        .Where(item => item is not null)
+        .Cast<MediaApiDto>()
+        .ToArray();
+
+    private static IReadOnlyList<uint> ParseMediaIds(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        if (uint.TryParse(value, out var directId)) return [directId];
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var ids = new List<uint>();
+            CollectMediaIds(document.RootElement, ids);
+            return ids;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static void CollectMediaIds(JsonElement element, List<uint> ids)
+    {
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetUInt32(out var number))
+        {
+            ids.Add(number);
+            return;
+        }
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) CollectMediaIds(item, ids);
+            return;
+        }
+        if (element.ValueKind != JsonValueKind.Object) return;
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.NameEquals("mediaId") || property.NameEquals("mediaIds") || property.NameEquals("images"))
+            {
+                CollectMediaIds(property.Value, ids);
+            }
+        }
+    }
+
+    private string? ResolveUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+        {
+            return absolute.Scheme is "http" or "https" ? absolute.ToString() : null;
+        }
+
+        var baseUrl = Configuration["Api:BaseUrl"];
+        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var apiBase) ? new Uri(apiBase, value).ToString() : null;
+    }
+
+    private string BuildTextStyle()
+    {
+        var styles = new List<string>();
+        var alignment = GetSetting("textAlign");
+        if (alignment is "left" or "center" or "right" or "justify") styles.Add($"text-align:{alignment}");
+        if (GetSetting("fontSize") is { } size && System.Text.RegularExpressions.Regex.IsMatch(size, "^[0-9.]+(px|rem|em|%)$")) styles.Add($"font-size:{size}");
+        if (GetSetting("color") is { } color && System.Text.RegularExpressions.Regex.IsMatch(color, "^#[0-9a-fA-F]{3,8}$")) styles.Add($"color:{color}");
+        if (GetSetting("fontFamily") is { } family && System.Text.RegularExpressions.Regex.IsMatch(family, "^[a-zA-Z0-9 ,'-]+$")) styles.Add($"font-family:{family}");
+        return string.Join(';', styles);
+    }
+
+    private string GetLinkTarget() => GetSetting("target") == "_blank" ? "_blank" : "_self";
+
+    private static string ToEmbedUrl(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Host.Contains("youtube.com") && uri.Query.Contains("v="))
+        {
+            var id = uri.Query.TrimStart('?').Split('&').FirstOrDefault(item => item.StartsWith("v="))?.Substring(2);
+            if (!string.IsNullOrWhiteSpace(id)) return $"https://www.youtube-nocookie.com/embed/{id}";
+        }
+        if (Uri.TryCreate(url, UriKind.Absolute, out uri) && uri.Host == "youtu.be")
+        {
+            return $"https://www.youtube-nocookie.com/embed/{uri.AbsolutePath.Trim('/')}";
+        }
+        return url;
+    }
+
+    private sealed record GalleryImage(string? Url, string? Alt, string? Caption);
+}

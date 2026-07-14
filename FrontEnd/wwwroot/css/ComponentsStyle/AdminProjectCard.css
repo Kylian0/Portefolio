@@ -13,7 +13,11 @@
 .admin-project-card:hover, .admin-project-card:focus-visible { border-color: var(--color-primary); box-shadow: 0 12px 32px var(--shadow-soft); transform: translateY(-3px); }
 .admin-project-card > img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--color-primary-soft); }
 .admin-project-card__body { display: grid; gap: 0.65rem; padding: 1.1rem; }
+.admin-project-card__heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .admin-project-card__type { color: var(--color-primary); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.admin-project-card__status--published { color: var(--color-success-text); }
+.admin-project-card__status--archived { color: var(--color-muted); }
+.admin-project-card__featured { padding: 0.22rem 0.45rem; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.68rem; font-weight: 750; }
 .admin-project-card__body > strong { font-size: 1.12rem; }
 .admin-project-card__description { color: var(--color-muted); font-size: 0.9rem; line-height: 1.55; }
 .admin-project-card__technologies { display: flex; flex-wrap: wrap; gap: 0.35rem; }

@@ -67,6 +67,40 @@ public sealed class ProjectDocumentBlock
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
+    public async Task<IReadOnlyList<ProjectDocumentBlock>> SynchronizeAsync(uint documentId, string title, IReadOnlyList<ProjectDocumentBlock> blocks, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(GetConnectionString());
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await using (var updateDocument = new MySqlCommand("UPDATE project_documents SET title = @title WHERE id = @documentId;", connection, transaction))
+            {
+                updateDocument.Parameters.Add("@title", MySqlDbType.VarChar).Value = title.Trim();
+                updateDocument.Parameters.Add("@documentId", MySqlDbType.UInt32).Value = documentId;
+                await updateDocument.ExecuteNonQueryAsync(cancellationToken);
+            }
+            await using (var deleteBlocks = new MySqlCommand("DELETE FROM project_document_blocks WHERE document_id = @documentId;", connection, transaction))
+            {
+                deleteBlocks.Parameters.Add("@documentId", MySqlDbType.UInt32).Value = documentId;
+                await deleteBlocks.ExecuteNonQueryAsync(cancellationToken);
+            }
+            foreach (var block in blocks)
+            {
+                await using var insert = new MySqlCommand("INSERT INTO project_document_blocks (document_id, block_type, content, settings, display_order) VALUES (@documentId, @blockType, @content, @settings, @displayOrder);", connection, transaction);
+                AddParameters(insert, block);
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+        return await GetByDocumentIdAsync(documentId, cancellationToken);
+    }
+
     private async Task<IReadOnlyList<ProjectDocumentBlock>> GetManyAsync(string sql, uint? documentId, CancellationToken cancellationToken)
     {
         var blocks = new List<ProjectDocumentBlock>();

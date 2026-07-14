@@ -1,5 +1,6 @@
 using BackEnd.Dtos;
 using BackEnd.Models;
+using BackEnd.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BackEnd.Controllers;
@@ -8,17 +9,18 @@ namespace BackEnd.Controllers;
 [Route("api/project-document-blocks")]
 public sealed class ProjectDocumentBlocksController(
     ProjectDocumentBlock blockModel,
-    ProjectDocument documentModel) : ControllerBase
+    ProjectDocument documentModel,
+    HtmlDocumentBlockConverter converter) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ProjectDocumentBlockDto>>> GetAll(CancellationToken cancellationToken) =>
-        Ok((await blockModel.GetAllAsync(cancellationToken)).Select(Map).ToArray());
+        Ok((await blockModel.GetAllAsync(cancellationToken)).Select(converter.SanitizeBlock).Select(Map).ToArray());
 
     [HttpGet("{id}")]
     public async Task<ActionResult<ProjectDocumentBlockDto>> GetById(uint id, CancellationToken cancellationToken)
     {
         var block = await blockModel.GetByIdAsync(id, cancellationToken);
-        return block is null ? BlockNotFound(id) : Ok(Map(block));
+        return block is null ? BlockNotFound(id) : Ok(Map(converter.SanitizeBlock(block)));
     }
 
     [HttpPost]
@@ -29,7 +31,7 @@ public sealed class ProjectDocumentBlocksController(
             return DocumentNotFound(request.DocumentId);
         }
 
-        var block = Map(await blockModel.CreateAsync(ToEntity(request), cancellationToken));
+        var block = Map(await blockModel.CreateAsync(converter.SanitizeBlock(ToEntity(request)), cancellationToken));
         return CreatedAtAction(nameof(GetById), new { id = block.Id }, block);
     }
 
@@ -45,8 +47,8 @@ public sealed class ProjectDocumentBlocksController(
             return DocumentNotFound(request.DocumentId);
         }
 
-        var block = await blockModel.UpdateAsync(id, ToEntity(request, id), cancellationToken);
-        return block is null ? BlockNotFound(id) : Ok(Map(block));
+        var block = await blockModel.UpdateAsync(id, converter.SanitizeBlock(ToEntity(request, id)), cancellationToken);
+        return block is null ? BlockNotFound(id) : Ok(Map(converter.SanitizeBlock(block)));
     }
 
     [HttpDelete("{id}")]
@@ -64,6 +66,18 @@ public sealed class ProjectDocumentBlocksController(
         }
 
         var blocks = await blockModel.GetByDocumentIdAsync(documentId, cancellationToken);
+        return Ok(blocks.Select(converter.SanitizeBlock).Select(Map).ToArray());
+    }
+
+    [HttpPut("/api/project-documents/{documentId}/content")]
+    public async Task<ActionResult<IReadOnlyList<ProjectDocumentBlockDto>>> Synchronize(
+        uint documentId,
+        [FromBody] ProjectDocumentSyncDto request,
+        CancellationToken cancellationToken)
+    {
+        if (await documentModel.GetByIdAsync(documentId, cancellationToken) is null) return DocumentNotFound(documentId);
+        var normalized = converter.Convert(documentId, request.Html);
+        var blocks = await blockModel.SynchronizeAsync(documentId, request.Title, normalized, cancellationToken);
         return Ok(blocks.Select(Map).ToArray());
     }
 

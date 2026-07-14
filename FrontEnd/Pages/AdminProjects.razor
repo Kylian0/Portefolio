@@ -1,8 +1,7 @@
 @page "/admin/projects"
-@using FrontEnd.Models
-@using FrontEnd.Services
 @inject IAdminAccessService AdminAccess
-@inject IAdminProjectService ProjectService
+@inject IProjectApiService ProjectApiService
+@inject IProjectTechnologyApiService TechnologyApiService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
@@ -14,10 +13,7 @@
         <aside class="admin-sidebar">
             <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
             <nav aria-label="Navigation de l'administration">
-                <a href="/admin">Vue d'ensemble</a>
-                <a class="is-active" href="/admin/projects">Projets</a>
-                <a href="/admin/messages">Messages</a>
-                <a href="/">Voir le portfolio</a>
+                <a href="/admin">Vue d'ensemble</a><a class="is-active" href="/admin/projects">Projets</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a>
             </nav>
         </aside>
 
@@ -28,55 +24,71 @@
             </header>
 
             <section class="admin-project-tools" aria-label="Recherche et filtres">
-                <label class="admin-project-search">
-                    <span class="visually-hidden">Rechercher un projet</span>
-                    <input type="search" placeholder="Rechercher par nom…" @bind="searchTerm" @bind:event="oninput" />
-                </label>
-                <button type="button" class="admin-filter-toggle" aria-expanded="@filtersOpen" @onclick="() => filtersOpen = !filtersOpen">
+                <label class="admin-project-search"><span class="visually-hidden">Rechercher un projet</span><input type="search" placeholder="Rechercher par titre, slug ou description…" @bind="searchTerm" @bind:event="oninput" disabled="@isLoading" /></label>
+                <button type="button" class="projects-filter-toggle" aria-expanded="@filtersOpen" aria-controls="admin-project-filters" disabled="@isLoading" @onclick="() => filtersOpen = !filtersOpen">
                     Filtres @if (ActiveFilterCount > 0) { <span>@ActiveFilterCount</span> }
                 </button>
             </section>
 
             @if (filtersOpen)
             {
-                <section class="admin-filters" aria-label="Filtres des projets">
-                    <fieldset>
-                        <legend>Type de projet</legend>
-                        @foreach (var option in projectTypes)
+                <section id="admin-project-filters" class="projects-filter-panel" aria-label="Filtres des projets">
+                    <header><div><strong>Filtrer les projets</strong><p>Sélectionnez un statut, une catégorie ou une technologie.</p></div>@if (ActiveFilterCount > 0) { <button type="button" @onclick="ClearFilters">Tout effacer</button> }</header>
+                    <fieldset class="admin-status-filters">
+                        <legend>Statut</legend>
+                        @foreach (var status in statuses)
                         {
-                            <label><input type="checkbox" checked="@selectedTypes.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedTypes, option, eventArgs)" /> @option</label>
+                            <label><input type="checkbox" checked="@selectedStatuses.Contains(status)" @onchange="args => ToggleValue(selectedStatuses, status, args)" /><span>@GetStatusLabel(status)</span></label>
                         }
                     </fieldset>
-                    <fieldset>
-                        <legend>Langage</legend>
-                        @foreach (var option in languages)
+                    <div class="projects-filter-groups">
+                        @foreach (var category in technologyCategories.OrderBy(item => item.DisplayOrder).ThenBy(item => item.Name))
                         {
-                            <label><input type="checkbox" checked="@selectedLanguages.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedLanguages, option, eventArgs)" /> @option</label>
+                            var categoryTechnologies = GetCatalogTechnologies(category.Id);
+                            var expanded = expandedCategoryIds.Contains(category.Id);
+                            <section class="projects-filter-group">
+                                <button type="button" class="projects-filter-group__toggle" aria-expanded="@expanded" @onclick="() => ToggleCategory(category.Id)"><span>@GetCategoryName(category)</span><small>@categoryTechnologies.Count</small><span aria-hidden="true">@(expanded ? "−" : "+")</span></button>
+                                @if (expanded)
+                                {
+                                    <div class="projects-filter-group__options">
+                                        <label class="projects-filter-group__all"><input type="checkbox" checked="@selectedCategoryIds.Contains(category.Id)" @onchange="args => ToggleId(selectedCategoryIds, category.Id, args)" /><span>Toute la catégorie</span></label>
+                                        @if (categoryTechnologies.Count == 0) { <p>Aucune technologie dans cette catégorie.</p> }
+                                        @foreach (var technology in categoryTechnologies)
+                                        {
+                                            <label><input type="checkbox" checked="@selectedTechnologyIds.Contains(technology.Id)" @onchange="args => ToggleId(selectedTechnologyIds, technology.Id, args)" /><span>@GetTechnologyName(technology)</span></label>
+                                        }
+                                    </div>
+                                }
+                            </section>
                         }
-                    </fieldset>
-                    <fieldset>
-                        <legend>Framework ou moteur</legend>
-                        @foreach (var option in frameworks)
-                        {
-                            <label><input type="checkbox" checked="@selectedFrameworks.Contains(option)" @onchange="eventArgs => ToggleFilter(selectedFrameworks, option, eventArgs)" /> @option</label>
-                        }
-                    </fieldset>
-                    <button type="button" class="admin-clear-filters" @onclick="ClearFilters">Réinitialiser les filtres</button>
+                    </div>
                 </section>
             }
 
-            @if (FilteredProjects.Count > 0)
+            @if (isLoading)
+            {
+                <div class="admin-project-empty" aria-live="polite">Chargement des projets…</div>
+            }
+            else if (pageErrors.Count > 0)
+            {
+                <div class="admin-project-empty admin-project-error" role="alert">@foreach (var error in pageErrors) { <p>@error</p> }<button type="button" @onclick="LoadProjectsAsync">Réessayer</button></div>
+            }
+            else if (projects.Count == 0)
+            {
+                <div class="admin-project-empty">Aucun projet n’est enregistré.</div>
+            }
+            else if (FilteredProjects.Count == 0)
+            {
+                <div class="admin-project-empty">Aucun projet ne correspond à la recherche et aux filtres sélectionnés.</div>
+            }
+            else
             {
                 <section class="admin-project-grid" aria-label="Liste des projets administrables">
                     @foreach (var project in FilteredProjects)
                     {
-                        <AdminProjectCard Project="project" OnSelected="OpenProject" />
+                        <AdminProjectCard Project="project" Technologies="@GetProjectTechnologies(project.Id)" OnSelected="OpenProject" @key="project.Id" />
                     }
                 </section>
-            }
-            else
-            {
-                <div class="admin-project-empty">Aucun projet ne correspond à votre recherche et aux filtres sélectionnés.</div>
             }
         </div>
     </main>
@@ -86,85 +98,129 @@
 {
     <div class="admin-modal-backdrop" @onclick="CloseProject">
         <section class="admin-project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title" @onclick:stopPropagation="true">
-            <header><div><p class="admin-eyebrow">Modifier le projet</p><h2 id="project-modal-title">@selectedProject.Name</h2></div><button type="button" aria-label="Fermer" @onclick="CloseProject">×</button></header>
+            <header><div><p class="admin-eyebrow">Modifier le projet</p><h2 id="project-modal-title">@selectedProject.Title</h2></div><button type="button" aria-label="Fermer" disabled="@isSubmitting" @onclick="CloseProject">×</button></header>
             <div class="admin-project-form">
-                <div class="form-field"><label for="project-name">Nom</label><input id="project-name" @bind="selectedProject.Name" /></div>
-                <div class="form-field"><label for="project-description">Description</label><textarea id="project-description" rows="4" @bind="selectedProject.Description"></textarea></div>
-                <div class="form-field"><label for="project-image">Adresse de l'image</label><input id="project-image" @bind="selectedProject.ImageUrl" /></div>
-                <div class="form-field"><label for="project-type">Type</label><input id="project-type" @bind="selectedProject.Type" /></div>
-                <div class="form-field"><label for="project-technologies">Technologies (séparées par des virgules)</label><input id="project-technologies" value="@technologyInput" @oninput="UpdateTechnologyInput" /></div>
+                <div class="form-field"><label for="project-title">Titre</label><input id="project-title" maxlength="200" @bind="selectedProject.Title" /></div>
+                <div class="form-field"><label for="project-slug">Slug</label><input id="project-slug" maxlength="200" @bind="selectedProject.Slug" /></div>
+                <div class="form-field"><label for="project-description">Description courte</label><textarea id="project-description" maxlength="500" rows="4" @bind="selectedProject.ShortDescription"></textarea></div>
+                <div class="form-field"><label for="project-image">URL de l'image</label><input id="project-image" maxlength="500" @bind="selectedProject.ThumbnailUrl" /></div>
+                <div class="form-field"><label for="project-repository">URL du dépôt</label><input id="project-repository" maxlength="500" @bind="selectedProject.RepositoryUrl" /></div>
+                <div class="form-field"><label for="project-demo">URL de démonstration</label><input id="project-demo" maxlength="500" @bind="selectedProject.DemoUrl" /></div>
+                <div class="form-field"><label for="project-status">Statut</label><select id="project-status" @bind="selectedProject.Status">@foreach (var status in statuses) { <option value="@status">@GetStatusLabel(status)</option> }</select></div>
+                <div class="form-field"><label for="project-order">Ordre d'affichage</label><input id="project-order" type="number" @bind="selectedProject.DisplayOrder" /></div>
+                <div class="form-field"><label for="project-started">Date de début</label><input id="project-started" type="date" @bind="selectedProject.StartedAt" /></div>
+                <div class="form-field"><label for="project-completed">Date de fin</label><input id="project-completed" type="date" @bind="selectedProject.CompletedAt" /></div>
+                <div class="form-field"><label for="project-published">Date de publication</label><input id="project-published" type="datetime-local" @bind="selectedProject.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm" /></div>
+                <label class="admin-project-featured"><input type="checkbox" @bind="selectedProject.IsFeatured" /><span>Mettre ce projet en avant</span></label>
             </div>
+            @if (modalErrors.Count > 0) { <div class="admin-modal-errors" role="alert">@foreach (var error in modalErrors) { <p>@error</p> }</div> }
             @if (!string.IsNullOrEmpty(modalMessage)) { <p class="admin-modal-message" role="status">@modalMessage</p> }
-            <footer>
-                <button type="button" class="admin-danger-button" @onclick="DeleteProject">Supprimer</button>
-                <a href="@($"/projects/{selectedProject.Slug}?admin=true")">Ouvrir la documentation</a>
-                <button type="button" class="admin-primary-button" @onclick="SaveProject">Enregistrer</button>
-            </footer>
+            <nav class="admin-related-links" aria-label="Données liées au projet">
+                <a href="@($"/projects/{selectedProject.Slug}?admin=true")">Documentation</a>
+                <button type="button" @onclick="ShowTechnologiesMessage">Technologies</button>
+                <button type="button" @onclick="ShowMediaMessage">Médias</button>
+                <button type="button" @onclick="ShowLearningsMessage">Apprentissages</button>
+            </nav>
+            <p class="admin-delete-warning">La suppression peut également supprimer les documents, blocs, médias, technologies associées et apprentissages liés au projet.</p>
+            <footer><button type="button" class="admin-danger-button" disabled="@isSubmitting" @onclick="DeleteProjectAsync">Supprimer</button><button type="button" class="admin-primary-button" disabled="@isSubmitting" @onclick="SaveProjectAsync">@(isSubmitting ? "Enregistrement…" : "Enregistrer")</button></footer>
         </section>
     </div>
 }
 
 @code {
-    private IReadOnlyList<AdminProject> projects = [];
-    private AdminProject? selectedProject;
+    private readonly List<ProjectApiDto> projects = [];
+    private readonly Dictionary<uint, IReadOnlyList<ProjectTechnologyApiDto>> technologiesByProject = [];
+    private readonly List<TechnologyCategoryApiDto> technologyCategories = [];
+    private readonly List<TechnologyApiDto> technologyCatalog = [];
+    private readonly HashSet<string> selectedStatuses = [];
+    private readonly HashSet<uint> selectedCategoryIds = [];
+    private readonly HashSet<uint> selectedTechnologyIds = [];
+    private readonly HashSet<uint> expandedCategoryIds = [];
+    private readonly List<string> pageErrors = [];
+    private readonly List<string> modalErrors = [];
+    private readonly string[] statuses = ["draft", "published", "archived"];
+    private ProjectApiDto? selectedProject;
     private string searchTerm = string.Empty;
-    private string technologyInput = string.Empty;
     private string? modalMessage;
     private bool filtersOpen;
-    private readonly HashSet<string> selectedTypes = [];
-    private readonly HashSet<string> selectedLanguages = [];
-    private readonly HashSet<string> selectedFrameworks = [];
-    private readonly string[] projectTypes = ["Web", "Mobile", "Jeu vidéo"];
-    private readonly string[] languages = ["C#", "C++", "Java"];
-    private readonly string[] frameworks = ["ASP.NET Core", "Blazor", ".NET MAUI", "Unity", "Unreal Engine"];
+    private bool isLoading = true;
+    private bool isSubmitting;
 
-    private List<AdminProject> FilteredProjects => projects.Where(project =>
-        (string.IsNullOrWhiteSpace(searchTerm) || project.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
-        (selectedTypes.Count == 0 || selectedTypes.Contains(project.Type)) &&
-        (selectedLanguages.Count == 0 || project.Languages.Any(selectedLanguages.Contains)) &&
-        (selectedFrameworks.Count == 0 || project.Frameworks.Any(selectedFrameworks.Contains))).ToList();
-
-    private int ActiveFilterCount => selectedTypes.Count + selectedLanguages.Count + selectedFrameworks.Count;
+    private List<ProjectApiDto> FilteredProjects => projects.Where(project =>
+        (string.IsNullOrWhiteSpace(searchTerm) || project.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.Slug.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.ShortDescription.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (selectedStatuses.Count == 0 || selectedStatuses.Contains(project.Status)) && MatchesTechnologyFilters(project.Id)).ToList();
+    private int ActiveFilterCount => selectedStatuses.Count + selectedCategoryIds.Count + selectedTechnologyIds.Count;
 
     protected override async Task OnInitializedAsync()
     {
         if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login", replace: true); return; }
-        projects = await ProjectService.GetAllAsync();
+        await LoadProjectsAsync();
     }
 
-    private void ToggleFilter(HashSet<string> target, string value, ChangeEventArgs args)
+    private async Task LoadProjectsAsync()
     {
-        if (args.Value is true) target.Add(value); else target.Remove(value);
+        isLoading = true; pageErrors.Clear(); projects.Clear(); technologiesByProject.Clear();
+        try
+        {
+            var projectItems = await ProjectApiService.GetAllAsync(); projects.AddRange(projectItems);
+            var categoriesTask = TechnologyApiService.GetCategoriesAsync(); var catalogTask = TechnologyApiService.GetAllAsync();
+            await Task.WhenAll(categoriesTask, catalogTask);
+            technologyCategories.Clear(); technologyCategories.AddRange(await categoriesTask);
+            technologyCatalog.Clear(); technologyCatalog.AddRange(await catalogTask);
+            await Task.WhenAll(projects.Select(LoadProjectTechnologiesAsync));
+        }
+        catch (Exception) { pageErrors.Add("Impossible de charger les projets. Vérifiez que l’API est disponible."); }
+        finally { isLoading = false; }
     }
 
-    private void ClearFilters() { selectedTypes.Clear(); selectedLanguages.Clear(); selectedFrameworks.Clear(); }
-
-    private void OpenProject(AdminProject project)
+    private async Task LoadProjectTechnologiesAsync(ProjectApiDto project)
     {
-        selectedProject = new AdminProject { Slug = project.Slug, Name = project.Name, Description = project.Description, ImageUrl = project.ImageUrl, Type = project.Type, Languages = [.. project.Languages], Frameworks = [.. project.Frameworks] };
-        technologyInput = string.Join(", ", selectedProject.Technologies);
-        modalMessage = null;
+        try { technologiesByProject[project.Id] = await TechnologyApiService.GetByProjectIdAsync(project.Id); }
+        catch { technologiesByProject[project.Id] = []; }
     }
 
-    private void CloseProject() => selectedProject = null;
-    private void UpdateTechnologyInput(ChangeEventArgs args) => technologyInput = args.Value?.ToString() ?? string.Empty;
+    private IReadOnlyList<ProjectTechnologyApiDto> GetProjectTechnologies(uint projectId) => technologiesByProject.GetValueOrDefault(projectId) ?? [];
+    private IReadOnlyList<TechnologyApiDto> GetCatalogTechnologies(uint categoryId) => technologyCatalog.Where(item => item.CategoryId == categoryId).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+    private bool MatchesTechnologyFilters(uint projectId) { if (selectedCategoryIds.Count == 0 && selectedTechnologyIds.Count == 0) return true; return GetProjectTechnologies(projectId).Any(item => selectedCategoryIds.Contains(item.CategoryId) || selectedTechnologyIds.Contains(item.TechnologyId)); }
+    private void ClearFilters() { selectedStatuses.Clear(); selectedCategoryIds.Clear(); selectedTechnologyIds.Clear(); }
+    private void ToggleCategory(uint id) { if (!expandedCategoryIds.Add(id)) expandedCategoryIds.Remove(id); }
+    private static void ToggleId(HashSet<uint> target, uint id, ChangeEventArgs args) { if (args.Value is true) target.Add(id); else target.Remove(id); }
+    private static void ToggleValue(HashSet<string> target, string value, ChangeEventArgs args) { if (args.Value is true) target.Add(value); else target.Remove(value); }
+    private static string GetCategoryName(TechnologyCategoryApiDto item) => string.IsNullOrWhiteSpace(item.Name) ? "Catégorie non renseignée" : item.Name;
+    private static string GetTechnologyName(TechnologyApiDto item) => string.IsNullOrWhiteSpace(item.Name) ? "Technologie non renseignée" : item.Name;
+    private static string GetStatusLabel(string status) => status switch { "draft" => "Brouillon", "published" => "Publié", "archived" => "Archivé", _ => status };
 
-    private async Task SaveProject()
+    private void OpenProject(ProjectApiDto project) { selectedProject = Copy(project); modalErrors.Clear(); modalMessage = null; }
+    private void CloseProject() { if (!isSubmitting) selectedProject = null; }
+    private void ShowRelatedMessage(string section) => modalMessage = $"La gestion des {section} sera connectée lors d’une prochaine étape.";
+    private void ShowTechnologiesMessage() => ShowRelatedMessage("technologies");
+    private void ShowMediaMessage() => ShowRelatedMessage("médias");
+    private void ShowLearningsMessage() => ShowRelatedMessage("apprentissages");
+
+    private async Task SaveProjectAsync()
     {
-        if (selectedProject is null) return;
-        var technologies = technologyInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        selectedProject.Languages = technologies.Where(languages.Contains).ToList();
-        selectedProject.Frameworks = technologies.Where(item => !selectedProject.Languages.Contains(item)).ToList();
-        await ProjectService.UpdateAsync(selectedProject);
-        projects = await ProjectService.GetAllAsync();
-        modalMessage = "Les modifications ont été enregistrées localement.";
+        if (selectedProject is null || isSubmitting) return; isSubmitting = true; modalErrors.Clear(); modalMessage = null;
+        try
+        {
+            var updated = await ProjectApiService.UpdateAsync(selectedProject.Id, selectedProject);
+            var index = projects.FindIndex(item => item.Id == updated.Id); if (index >= 0) projects[index] = updated;
+            selectedProject = null;
+        }
+        catch (ProjectApiException exception) { modalErrors.AddRange(exception.Errors); }
+        catch (Exception) { modalErrors.Add("Impossible de modifier le projet. Vérifiez la connexion à l’API."); }
+        finally { isSubmitting = false; }
     }
 
-    private async Task DeleteProject()
+    private async Task DeleteProjectAsync()
     {
-        if (selectedProject is null || !await JSRuntime.InvokeAsync<bool>("confirm", $"Supprimer « {selectedProject.Name} » ? Cette action est simulée.")) return;
-        await ProjectService.DeleteAsync(selectedProject.Slug);
-        projects = await ProjectService.GetAllAsync();
-        selectedProject = null;
+        if (selectedProject is null || isSubmitting) return;
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Supprimer définitivement « {selectedProject.Title} » ? Les données liées peuvent également être supprimées en cascade.");
+        if (!confirmed) return; isSubmitting = true; modalErrors.Clear();
+        try { await ProjectApiService.DeleteAsync(selectedProject.Id); projects.RemoveAll(item => item.Id == selectedProject.Id); technologiesByProject.Remove(selectedProject.Id); selectedProject = null; }
+        catch (ProjectApiException exception) { modalErrors.AddRange(exception.Errors); }
+        catch (Exception) { modalErrors.Add("Impossible de supprimer le projet. Vérifiez la connexion à l’API."); }
+        finally { isSubmitting = false; }
     }
+
+    private static ProjectApiDto Copy(ProjectApiDto item) => new() { Id = item.Id, Title = item.Title, Slug = item.Slug, ShortDescription = item.ShortDescription, ThumbnailUrl = item.ThumbnailUrl, RepositoryUrl = item.RepositoryUrl, DemoUrl = item.DemoUrl, Status = item.Status, IsFeatured = item.IsFeatured, DisplayOrder = item.DisplayOrder, StartedAt = item.StartedAt, CompletedAt = item.CompletedAt, CreatedAt = item.CreatedAt, UpdatedAt = item.UpdatedAt, PublishedAt = item.PublishedAt };
 }

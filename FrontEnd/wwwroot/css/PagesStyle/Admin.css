@@ -106,7 +106,20 @@
 .admin-project-modal > header > button { border: 0; background: transparent; color: var(--color-muted); cursor: pointer; font-size: 1.8rem; }
 .admin-project-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
 .admin-project-form .form-field:nth-child(2), .admin-project-form .form-field:nth-child(3), .admin-project-form .form-field:nth-child(5) { grid-column: 1 / -1; }
-.admin-project-form input, .admin-project-form textarea { width: 100%; padding: 0.8rem 0.9rem; border: 1px solid var(--color-input-border); border-radius: 0.55rem; background: var(--color-surface); color: var(--color-text); font: inherit; }
+.admin-project-form input, .admin-project-form textarea, .admin-project-form select { width: 100%; padding: 0.8rem 0.9rem; border: 1px solid var(--color-input-border); border-radius: 0.55rem; background: var(--color-surface); color: var(--color-text); font: inherit; }
+.admin-project-featured { display: flex; grid-column: 1 / -1; align-items: center; gap: 0.6rem; padding: 0.75rem; border-radius: 0.5rem; background: var(--color-primary-soft); cursor: pointer; }
+.admin-project-featured input { width: auto; }
+.admin-status-filters { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; margin: 0 0 1rem; padding: 0 0 1rem; border: 0; border-bottom: 1px solid var(--color-border); }
+.admin-status-filters legend { width: 100%; margin-bottom: 0.6rem; color: var(--color-text); font-weight: 750; }
+.admin-status-filters label { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--color-muted); cursor: pointer; font-size: 0.88rem; }
+.admin-status-filters input { accent-color: var(--color-primary); }
+.admin-modal-errors { margin-top: 1rem; padding: 0.8rem 1rem; border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border)); border-radius: 0.5rem; background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface)); color: var(--color-danger); }
+.admin-modal-errors p, .admin-project-error p { margin: 0; }
+.admin-modal-errors p + p { margin-top: 0.35rem; }
+.admin-related-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.2rem; }
+.admin-related-links a, .admin-related-links button { padding: 0.55rem 0.7rem; border: 1px solid var(--color-border); border-radius: 0.45rem; background: var(--color-surface); color: var(--color-primary); cursor: pointer; font: inherit; font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+.admin-delete-warning { margin: 1rem 0 0; color: var(--color-muted); font-size: 0.8rem; line-height: 1.5; }
+.admin-project-error button { margin-top: 1rem; border: 0; background: transparent; color: var(--color-primary); cursor: pointer; font: inherit; font-weight: 700; }
 .admin-modal-message { color: var(--color-success-text); }
 .admin-project-modal > footer { display: flex; align-items: center; gap: 0.7rem; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--color-border); }
 .admin-project-modal > footer button, .admin-project-modal > footer a { padding: 0.7rem 0.9rem; border: 1px solid var(--color-border); border-radius: 0.5rem; cursor: pointer; font: inherit; font-weight: 700; text-decoration: none; }
@@ -116,6 +129,7 @@
 
 @media (max-width: 1050px) { .admin-project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) {
+    .admin-project-tools { flex-direction: column; }
     .admin-filters, .admin-project-grid { grid-template-columns: 1fr; }
     .admin-project-form { grid-template-columns: 1fr; }
     .admin-project-form .form-field { grid-column: auto !important; }

@@ -1,0 +1,147 @@
+@using TinyMCE.Blazor
+@inject IProjectDocumentationService DocumentationService
+@inject DocumentBlockHtmlConverter Converter
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<section class="wysiwyg-editor" aria-label="Éditeur visuel de documentation">
+    @if (Data.Document is null)
+    {
+        <div class="documentation-editor__empty"><h2>Aucune documentation</h2><p>Créez un document pour commencer la rédaction.</p><button type="button" disabled="@isSaving" @onclick="CreateDocumentAsync">Créer la documentation</button></div>
+    }
+    else
+    {
+        <header class="wysiwyg-editor__header">
+            <div><p class="admin-eyebrow">Éditeur visuel</p><h2>@title</h2><span class="@(isDirty ? "is-dirty" : null)">@(isDirty ? "Modifications non enregistrées" : "Document enregistré")</span></div>
+            <div><button type="button" disabled="@(!isDirty || isSaving)" @onclick="CancelAsync">Annuler</button><button type="button" class="admin-primary-button" disabled="@(!isDirty || isSaving)" @onclick="SaveAsync">@(isSaving ? "Enregistrement…" : "Enregistrer")</button></div>
+        </header>
+
+        <label class="wysiwyg-editor__title"><span>Titre du document</span><input maxlength="200" value="@title" @oninput="OnTitleChanged" /></label>
+
+        @if (Data.Media.Count > 0)
+        {
+            <div class="wysiwyg-media-picker">
+                <label><span>Médiathèque du projet</span><select @bind="selectedMediaId"><option value="0">Choisir un média…</option>@foreach (var media in Data.Media) { <option value="@media.Id">@media.OriginalFilename (@media.MediaType)</option> }</select></label>
+                <button type="button" disabled="@(selectedMediaId == 0)" @onclick="InsertSelectedMedia">Insérer</button>
+            </div>
+            @if (Data.Media.Count(item => item.MediaType == "image") > 1)
+            {
+                <div class="wysiwyg-gallery-picker">
+                    <strong>Créer une galerie</strong>
+                    <div>@foreach (var image in Data.Media.Where(item => item.MediaType == "image")) { <label><input type="checkbox" checked="@selectedGalleryIds.Contains(image.Id)" @onchange="args => ToggleGalleryMedia(image.Id, args)" />@image.OriginalFilename</label> }</div>
+                    <button type="button" disabled="@(selectedGalleryIds.Count < 2)" @onclick="InsertGalleryAsync">Insérer la galerie</button>
+                </div>
+            }
+        }
+
+        <div class="wysiwyg-editor__page">
+            <Editor Id="portfolio-document-editor"
+                    Value="@html"
+                    ValueChanged="OnHtmlChanged"
+                    LicenseKey="gpl"
+                    ScriptSrc="/lib/tinymce/tinymce.min.js"
+                    Conf="@EditorConfiguration" />
+        </div>
+
+        <footer class="wysiwyg-editor__footer">
+            <button type="button" class="documentation-editor__danger" disabled="@isSaving" @onclick="DeleteDocumentAsync">Supprimer la documentation</button>
+            <small>L’aperçu TinyMCE utilise les mêmes styles de contenu ; le HTML sera nettoyé côté serveur avant publication.</small>
+        </footer>
+    }
+
+    @if (errors.Count > 0) { <div class="documentation-editor__errors" role="alert">@foreach (var error in errors) { <p>@error</p> }</div> }
+    @if (!string.IsNullOrWhiteSpace(successMessage)) { <p class="admin-modal-message" role="status">@successMessage</p> }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ProjectDocumentationData Data { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly List<string> errors = [];
+    private string html = string.Empty;
+    private string originalHtml = string.Empty;
+    private string title = "Documentation";
+    private string originalTitle = "Documentation";
+    private string? successMessage;
+    private uint selectedMediaId;
+    private readonly HashSet<uint> selectedGalleryIds = [];
+    private bool isDirty;
+    private bool isSaving;
+    private bool initialized;
+    private string DraftKey => $"portfolio-document-draft-{Data.Project?.Id}";
+
+    private Dictionary<string, object> EditorConfiguration => new()
+    {
+        ["height"] = 720,
+        ["menubar"] = "file edit view insert format tools table help",
+        ["plugins"] = "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount codesample",
+        ["toolbar"] = "undo redo | blocks fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | outdent indent | bullist numlist | link image media table blockquote codesample hr | removeformat code preview fullscreen",
+        ["toolbar_mode"] = "sliding",
+        ["skin"] = "oxide",
+        ["content_css"] = "default",
+        ["promotion"] = false,
+        ["branding"] = false,
+        ["automatic_uploads"] = false,
+        ["paste_data_images"] = false,
+        ["convert_unsafe_embeds"] = true,
+        ["valid_elements"] = "h1,h2,h3,h4,h5,h6,p,div,span,strong,b,em,i,u,s,strike,ul,ol,li,a[href|target|rel|class],blockquote,table,thead,tbody,tfoot,tr,th,td,pre[data-language],code,hr,img[src|alt|title|data-caption],figure[class],figcaption,video[src|controls|title],source[src],br",
+        ["content_style"] = "body{max-width:760px;margin:2rem auto;padding:2rem;font-family:system-ui,sans-serif;line-height:1.75;}img,video{max-width:100%;height:auto;}"
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (initialized) return;
+        originalHtml = html = Converter.ToEditableHtml(Data.Blocks);
+        originalTitle = title = Data.Document?.Title ?? "Documentation";
+        initialized = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Data.Document is null) return;
+        var draft = await JSRuntime.InvokeAsync<string?>("documentationEditor.loadDraft", DraftKey);
+        if (!string.IsNullOrWhiteSpace(draft) && draft != originalHtml) { html = draft; await MarkDirtyAsync(); StateHasChanged(); }
+    }
+
+    private async Task OnHtmlChanged(string value) { html = value; await JSRuntime.InvokeVoidAsync("documentationEditor.saveDraft", DraftKey, html); await MarkDirtyAsync(); }
+    private async Task OnTitleChanged(ChangeEventArgs args) { title = args.Value?.ToString() ?? string.Empty; await MarkDirtyAsync(); }
+    private async Task MarkDirtyAsync() { if (isDirty) return; isDirty = true; successMessage = null; await JSRuntime.InvokeVoidAsync("documentationEditor.enableLeaveWarning"); }
+
+    private async Task CreateDocumentAsync() => await RunAsync(async () => { await DocumentationService.CreateDocumentAsync(new() { ProjectId = Data.Project!.Id, Title = "Documentation" }); await OnChanged.InvokeAsync(); });
+    private async Task SaveAsync() => await RunAsync(async () => { await DocumentationService.SynchronizeAsync(Data.Document!.Id, title, html); originalHtml = html; originalTitle = title; isDirty = false; await JSRuntime.InvokeVoidAsync("documentationEditor.clearDraft", DraftKey); await JSRuntime.InvokeVoidAsync("documentationEditor.disableLeaveWarning"); successMessage = "Documentation enregistrée et nettoyée."; await OnChanged.InvokeAsync(); });
+    private async Task CancelAsync() { html = originalHtml; title = originalTitle; isDirty = false; errors.Clear(); await JSRuntime.InvokeVoidAsync("documentationEditor.clearDraft", DraftKey); await JSRuntime.InvokeVoidAsync("documentationEditor.disableLeaveWarning"); }
+    private async Task DeleteDocumentAsync() { if (!await JSRuntime.InvokeAsync<bool>("confirm", "Supprimer cette documentation et tous ses blocs ?")) return; await RunAsync(async () => { await DocumentationService.DeleteDocumentAsync(Data.Document!.Id); await JSRuntime.InvokeVoidAsync("documentationEditor.clearDraft", DraftKey); await JSRuntime.InvokeVoidAsync("documentationEditor.disableLeaveWarning"); await OnChanged.InvokeAsync(); }); }
+
+    private async Task InsertSelectedMedia()
+    {
+        var media = Data.Media.FirstOrDefault(item => item.Id == selectedMediaId); if (media is null) return;
+        var url = ResolveMediaUrl(media.PublicUrl); if (string.IsNullOrWhiteSpace(url)) return;
+        var fragment = media.MediaType switch { "image" => $"<img src=\"{url}\" alt=\"{media.AltText}\" data-caption=\"{media.Caption}\">", "video" => $"<video controls src=\"{url}\" title=\"{media.Caption}\"></video>", _ => $"<p><a href=\"{url}\" target=\"_blank\" rel=\"noopener\">{media.OriginalFilename}</a></p>" };
+        html += fragment; await OnHtmlChanged(html); selectedMediaId = 0;
+    }
+
+    private void ToggleGalleryMedia(uint id, ChangeEventArgs args) { if (args.Value is true) selectedGalleryIds.Add(id); else selectedGalleryIds.Remove(id); }
+    private async Task InsertGalleryAsync()
+    {
+        var images = Data.Media.Where(item => selectedGalleryIds.Contains(item.Id) && item.MediaType == "image")
+            .Select(item => $"<img src=\"{ResolveMediaUrl(item.PublicUrl)}\" alt=\"{item.AltText}\" data-caption=\"{item.Caption}\">");
+        html += $"<figure class=\"document-gallery\">{string.Join(string.Empty, images)}</figure>";
+        selectedGalleryIds.Clear(); await OnHtmlChanged(html);
+    }
+
+    private string? ResolveMediaUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute)) return absolute.ToString();
+        return Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var apiBase) ? new Uri(apiBase, value).ToString() : value;
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (isSaving) return; isSaving = true; errors.Clear(); successMessage = null;
+        try { await action(); }
+        catch (ProjectApiException exception) { errors.AddRange(exception.Errors); }
+        catch { errors.Add("L’opération n’a pas pu être effectuée. Les modifications locales sont conservées."); }
+        finally { isSaving = false; }
+    }
+}
