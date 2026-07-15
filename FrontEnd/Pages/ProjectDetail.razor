@@ -146,6 +146,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        await AdminAccess.InitializeAsync();
         if (AdminMode && !AdminAccess.IsAuthenticated)
         {
             Navigation.NavigateTo("/admin/login", replace: true);

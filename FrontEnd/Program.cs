@@ -17,7 +17,7 @@ builder.Services.AddScoped<IMediaApiService, MediaApiService>();
 builder.Services.AddScoped<IProjectTechnologyApiService, ProjectTechnologyApiService>();
 builder.Services.AddScoped<IProjectLearningApiService, ProjectLearningApiService>();
 builder.Services.AddScoped<DocumentBlockHtmlConverter>();
-builder.Services.AddScoped<IAdminAccessService, DemoAdminAccessService>();
+builder.Services.AddScoped<IAdminAccessService, IdentityAdminAccessService>();
 builder.Services.AddScoped<IAdminProjectService, DemoAdminProjectService>();
 builder.Services.AddScoped<IAdminMessageService, DemoAdminMessageService>();
 

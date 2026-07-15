@@ -38,6 +38,8 @@ services:
       MediaStorage__RootPath: /workspace/BackEnd/uploads
       MediaStorage__PublicPath: /uploads
       MediaStorage__MaxFileSizeBytes: "${MEDIA_MAX_FILE_SIZE_BYTES:-26214400}"
+      AdminBootstrap__Username: "${ADMIN_USERNAME:-}"
+      AdminBootstrap__Password: "${ADMIN_PASSWORD:-}"
     ports:
       - "${BACKEND_PORT:-5097}:5097"
     volumes:
@@ -45,6 +47,7 @@ services:
       - backend_bin:/workspace/BackEnd/bin
       - backend_obj:/workspace/BackEnd/obj
       - media_uploads:/workspace/BackEnd/uploads
+      - identity_keys:/root/.aspnet/DataProtection-Keys
     depends_on:
       mysql:
         condition: service_healthy
@@ -91,3 +94,4 @@ volumes:
   backend_bin:
   backend_obj:
   media_uploads:
+  identity_keys:

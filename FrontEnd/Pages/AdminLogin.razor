@@ -36,11 +36,6 @@
             <button class="admin-login-submit" type="submit">Se connecter</button>
         </EditForm>
 
-        <div class="admin-login-hint">
-            <strong>Accès de démonstration</strong>
-            <span>Identifiant : admin</span>
-            <span>Mot de passe : portfolio-demo</span>
-        </div>
     </section>
 </main>
 
@@ -48,8 +43,9 @@
     private readonly LoginCredentials credentials = new();
     private string? errorMessage;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await AdminAccess.InitializeAsync();
         if (AdminAccess.IsAuthenticated)
         {
             Navigation.NavigateTo("/admin");

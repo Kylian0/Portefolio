@@ -153,6 +153,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await AdminAccess.InitializeAsync();
         if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login", replace: true); return; }
         await LoadProjectsAsync();
     }
