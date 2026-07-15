@@ -127,18 +127,6 @@
             <p class="project-learnings__error" role="status">Les apprentissages sont temporairement indisponibles.</p>
         }
 
-        @if (!isLoading && string.IsNullOrEmpty(errorMessage) && data?.Project is not null && data.Media.Count > 0)
-        {
-            <section class="project-media-section" aria-labelledby="project-media-title">
-                <h2 id="project-media-title">Médias du projet</h2>
-                <div class="document-gallery">
-                    @foreach (var media in data.Media)
-                    {
-                        <ProjectMediaRenderer Media="@media" @key="media.Id" />
-                    }
-                </div>
-            </section>
-        }
     </article>
 </main>
 
