@@ -16,9 +16,9 @@ public sealed class DocumentBlockHtmlConverter
         {
             "rich_text" => content,
             "heading" => $"<h{GetInt(block.Settings, "level", 2)}>{Encode(content)}</h{GetInt(block.Settings, "level", 2)}>",
-            "image" => $"<img src=\"{Attr(content)}\" alt=\"{Attr(GetString(block.Settings, "alt"))}\" data-caption=\"{Attr(GetString(block.Settings, "caption"))}\">",
+            "image" => $"<img src=\"{Attr(content)}\" data-media-id=\"{Attr(GetString(block.Settings, "mediaId"))}\" alt=\"{Attr(GetString(block.Settings, "alt"))}\" data-caption=\"{Attr(GetString(block.Settings, "caption"))}\">",
             "gallery" => $"<figure class=\"document-gallery\">{GalleryHtml(block)}</figure>",
-            "video" => $"<video controls src=\"{Attr(content)}\" title=\"{Attr(GetString(block.Settings, "title"))}\"></video>",
+            "video" => $"<video controls src=\"{Attr(content)}\" data-media-id=\"{Attr(GetString(block.Settings, "mediaId"))}\" title=\"{Attr(GetString(block.Settings, "title"))}\"></video>",
             "code" => $"<pre data-language=\"{Attr(GetString(block.Settings, "language"))}\"><code>{Encode(content)}</code></pre>",
             "quote" => $"<blockquote>{Encode(content)}</blockquote>",
             "button" => $"<a class=\"document-button\" href=\"{Attr(GetString(block.Settings, "url"))}\" target=\"{Attr(GetString(block.Settings, "target"))}\">{Encode(content)}</a>",
@@ -35,7 +35,7 @@ public sealed class DocumentBlockHtmlConverter
             if (json is null || json.Value.ValueKind != JsonValueKind.Array) return block.Content ?? string.Empty;
             return string.Join(string.Empty, json.Value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String
                 ? $"<img src=\"{Attr(item.GetString())}\">"
-                : $"<img src=\"{Attr(item.TryGetProperty("url", out var url) ? url.GetString() : null)}\" alt=\"{Attr(item.TryGetProperty("alt", out var alt) ? alt.GetString() : null)}\">"));
+                : $"<img src=\"{Attr(item.TryGetProperty("url", out var url) ? url.GetString() : null)}\" data-media-id=\"{Attr(item.TryGetProperty("mediaId", out var mediaId) ? mediaId.ToString() : null)}\" alt=\"{Attr(item.TryGetProperty("alt", out var alt) ? alt.GetString() : null)}\" data-caption=\"{Attr(item.TryGetProperty("caption", out var caption) ? caption.GetString() : null)}\">"));
         }
         catch { return block.Content ?? string.Empty; }
     }

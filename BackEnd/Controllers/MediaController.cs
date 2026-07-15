@@ -1,13 +1,14 @@
 using BackEnd.Dtos;
 using BackEnd.Exceptions;
 using BackEnd.Models;
+using BackEnd.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BackEnd.Controllers;
 
 [ApiController]
 [Route("api/media")]
-public sealed class MediaController(Media mediaModel, Project projectModel) : ControllerBase
+public sealed class MediaController(Media mediaModel, Project projectModel, MediaFileStorageService storage, MediaReferenceService references) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<MediaDto>>> GetAll(CancellationToken cancellationToken) =>
@@ -73,9 +74,45 @@ public sealed class MediaController(Media mediaModel, Project projectModel) : Co
         }
     }
 
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<IReadOnlyList<MediaDto>>> Upload([FromForm] List<IFormFile> files, [FromForm] uint? projectId, CancellationToken cancellationToken)
+    {
+        if (files.Count == 0) return Problem(statusCode: 400, title: "No files supplied", detail: "Sélectionnez au moins un fichier.");
+        if (projectId.HasValue && await projectModel.GetByIdAsync(projectId.Value, cancellationToken) is null) return ProjectNotFound(projectId.Value);
+        var created = new List<Media>();
+        try
+        {
+            foreach (var file in files)
+            {
+                var stored = await storage.SaveAsync(file, cancellationToken);
+                try
+                {
+                    created.Add(await mediaModel.CreateAsync(new Media { ProjectId = projectId, MediaType = stored.MediaType, OriginalFilename = stored.OriginalFilename, StoredFilename = stored.StoredFilename, FilePath = stored.FilePath, PublicUrl = stored.PublicUrl, MimeType = stored.MimeType, FileSize = stored.FileSize }, cancellationToken));
+                }
+                catch { await storage.DeleteAsync(stored.FilePath); throw; }
+            }
+            return StatusCode(StatusCodes.Status201Created, created.Select(Map).ToArray());
+        }
+        catch (InvalidDataException exception) { await RollbackUploadsAsync(created); return Problem(statusCode: 400, title: "Invalid media file", detail: exception.Message); }
+        catch { await RollbackUploadsAsync(created); throw; }
+    }
+
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(uint id, CancellationToken cancellationToken) =>
-        await mediaModel.DeleteAsync(id, cancellationToken) ? NoContent() : MediaNotFound(id);
+    public async Task<IActionResult> Delete(uint id, CancellationToken cancellationToken)
+    {
+        var media = await mediaModel.GetByIdAsync(id, cancellationToken);
+        if (media is null) return MediaNotFound(id);
+        if (await references.IsReferencedAsync(id, cancellationToken)) return Problem(statusCode: 409, title: "Media is in use", detail: "Ce média est référencé dans une documentation et ne peut pas être supprimé.");
+        if (!await mediaModel.DeleteAsync(id, cancellationToken)) return MediaNotFound(id);
+        await storage.DeleteAsync(media.FilePath);
+        return NoContent();
+    }
+
+    private async Task RollbackUploadsAsync(IEnumerable<Media> items)
+    {
+        foreach (var item in items) { await mediaModel.DeleteAsync(item.Id, CancellationToken.None); await storage.DeleteAsync(item.FilePath); }
+    }
 
     private static Media ToEntity(MediaDto media, uint id = 0) => new()
     {

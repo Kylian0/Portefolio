@@ -44,10 +44,10 @@ public sealed class HtmlDocumentBlockConverter
         return tag switch
         {
             "h1" or "h2" or "h3" or "h4" or "h5" or "h6" => Block(documentId, "heading", element.TextContent, JsonSerializer.Serialize(new { level = int.Parse(tag[1..]) }), order),
-            "img" => Block(documentId, "image", element.GetAttribute("src"), JsonSerializer.Serialize(new { alt = element.GetAttribute("alt"), caption = element.GetAttribute("data-caption") }), order),
-            "figure" when element.ClassList.Contains("document-gallery") => Block(documentId, "gallery", element.InnerHtml, JsonSerializer.Serialize(new { images = element.QuerySelectorAll("img").Select(img => new { url = img.GetAttribute("src"), alt = img.GetAttribute("alt") }).ToArray() }), order),
+            "img" => Block(documentId, "image", element.GetAttribute("src"), JsonSerializer.Serialize(new { mediaId = GetMediaId(element), alt = element.GetAttribute("alt"), caption = element.GetAttribute("data-caption") }), order),
+            "figure" when element.ClassList.Contains("document-gallery") => Block(documentId, "gallery", element.InnerHtml, JsonSerializer.Serialize(new { mediaIds = element.QuerySelectorAll("img").Select(GetMediaId).Where(id => id.HasValue).Select(id => id!.Value).ToArray(), images = element.QuerySelectorAll("img").Select(img => new { mediaId = GetMediaId(img), url = img.GetAttribute("src"), alt = img.GetAttribute("alt"), caption = img.GetAttribute("data-caption") }).ToArray() }), order),
             "video" => SafeVideoUrl(element.GetAttribute("src") ?? element.QuerySelector("source")?.GetAttribute("src")) is { } videoUrl
-                ? Block(documentId, "video", videoUrl, JsonSerializer.Serialize(new { title = element.GetAttribute("title") }), order)
+                ? Block(documentId, "video", videoUrl, JsonSerializer.Serialize(new { mediaId = GetMediaId(element), title = element.GetAttribute("title") }), order)
                 : Rich(documentId, "<p>Vidéo externe non autorisée.</p>", order),
             "pre" => Block(documentId, "code", element.TextContent, JsonSerializer.Serialize(new { language = element.GetAttribute("data-language") ?? "text" }), order),
             "blockquote" => Block(documentId, "quote", element.TextContent, null, order),
@@ -64,7 +64,7 @@ public sealed class HtmlDocumentBlockConverter
     {
         var value = new HtmlSanitizer();
         value.AllowedTags.UnionWith(["h1","h2","h3","h4","h5","h6","p","div","span","strong","b","em","i","u","s","strike","ul","ol","li","a","blockquote","table","thead","tbody","tfoot","tr","th","td","pre","code","hr","img","figure","figcaption","video","source","br"]);
-        value.AllowedAttributes.UnionWith(["href","src","alt","title","target","rel","class","style","data-caption","data-language","controls"]);
+        value.AllowedAttributes.UnionWith(["href","src","alt","title","target","rel","class","style","data-caption","data-language","data-media-id","controls"]);
         value.AllowedCssProperties.UnionWith(["color","background-color","font-size","font-family","font-weight","font-style","text-decoration","text-align","margin-left","padding-left"]);
         value.AllowedSchemes.Clear(); value.AllowedSchemes.UnionWith(["http","https"]);
         return value;
@@ -77,4 +77,6 @@ public sealed class HtmlDocumentBlockConverter
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return null;
         return uri.Host is "youtube.com" or "www.youtube.com" or "youtube-nocookie.com" or "www.youtube-nocookie.com" or "youtu.be" or "vimeo.com" or "player.vimeo.com" ? value : null;
     }
+
+    private static uint? GetMediaId(IElement element) => uint.TryParse(element.GetAttribute("data-media-id"), out var id) ? id : null;
 }

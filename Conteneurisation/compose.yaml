@@ -35,12 +35,16 @@ services:
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
       ConnectionStrings__PortfolioDatabase: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-portfolio_db};User ID=${MYSQL_USER:-portfolio_dev};Password=${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD dans le fichier .env}"
+      MediaStorage__RootPath: /workspace/BackEnd/uploads
+      MediaStorage__PublicPath: /uploads
+      MediaStorage__MaxFileSizeBytes: "${MEDIA_MAX_FILE_SIZE_BYTES:-26214400}"
     ports:
       - "${BACKEND_PORT:-5097}:5097"
     volumes:
       - ../BackEnd:/workspace/BackEnd
       - backend_bin:/workspace/BackEnd/bin
       - backend_obj:/workspace/BackEnd/obj
+      - media_uploads:/workspace/BackEnd/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -86,3 +90,4 @@ volumes:
   frontend_obj:
   backend_bin:
   backend_obj:
+  media_uploads:

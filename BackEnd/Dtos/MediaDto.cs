@@ -20,7 +20,7 @@ public sealed class MediaDto
     [Required, StringLength(500)]
     public string FilePath { get; init; } = string.Empty;
 
-    [StringLength(500), Url]
+    [StringLength(500), RegularExpression(@"^(https?://|/).+", ErrorMessage = "PublicUrl must be an absolute HTTP(S) URL or an application-relative path.")]
     public string? PublicUrl { get; init; }
 
     [Required, StringLength(150)]

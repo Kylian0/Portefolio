@@ -1,0 +1,13 @@
+@inject IConfiguration Configuration
+@if (Open)
+{
+<div class="admin-modal-backdrop" @onclick="Cancel"><section class="media-picker-modal" role="dialog" aria-modal="true" @onclick:stopPropagation="true"><header><h2>Sélectionner dans la médiathèque</h2><button type="button" aria-label="Fermer" @onclick="Cancel">×</button></header>
+@if (Available.Count == 0) { <div class="admin-project-empty">Aucun média compatible pour ce projet.</div> } else { <div class="media-picker-grid">@foreach (var item in Available) { <button type="button" class="@(selected.Contains(item.Id) ? "is-selected" : null)" @onclick="() => Toggle(item.Id)">@if (item.MediaType == "image" && Resolve(item.PublicUrl) is { } url) { <img src="@url" alt="@(item.AltText ?? item.OriginalFilename)" /> } else { <span>@item.MediaType</span> }<strong>@item.OriginalFilename</strong></button> }</div> }
+<footer><a href="/admin/media">Gérer tous les médias</a><button type="button" @onclick="Cancel">Annuler</button><button type="button" class="admin-primary-button" disabled="@(selected.Count == 0)" @onclick="Confirm">Insérer</button></footer></section></div>
+}
+@code {
+ [Parameter] public bool Open { get; set; } [Parameter] public IReadOnlyList<MediaApiDto> Media { get; set; } = []; [Parameter] public string MediaType { get; set; } = "image"; [Parameter] public bool Multiple { get; set; } [Parameter] public EventCallback<IReadOnlyList<MediaApiDto>> OnSelected { get; set; } [Parameter] public EventCallback OnCancelled { get; set; }
+ private readonly HashSet<uint> selected=[]; private List<MediaApiDto> Available => Media.Where(x=>x.MediaType==MediaType).ToList();
+ private void Toggle(uint id){if(!Multiple)selected.Clear();if(!selected.Add(id))selected.Remove(id);} private async Task Confirm(){await OnSelected.InvokeAsync(Available.Where(x=>selected.Contains(x.Id)).ToArray());selected.Clear();} private async Task Cancel(){selected.Clear();await OnCancelled.InvokeAsync();}
+ private string? Resolve(string? value){if(string.IsNullOrWhiteSpace(value))return null;if(Uri.TryCreate(value,UriKind.Absolute,out var absolute))return absolute.ToString();return Uri.TryCreate(Configuration["Api:BaseUrl"],UriKind.Absolute,out var root)?new Uri(root,value).ToString():null;}
+}

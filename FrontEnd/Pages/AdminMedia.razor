@@ -1,0 +1,70 @@
+@page "/admin/media"
+@inject IAdminAccessService AdminAccess
+@inject IMediaApiService MediaService
+@inject IProjectApiService ProjectService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IConfiguration Configuration
+
+<PageTitle>Médiathèque | Administration</PageTitle>
+
+@if (AdminAccess.IsAuthenticated)
+{
+<main class="admin-dashboard">
+    <aside class="admin-sidebar"><a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a><nav aria-label="Navigation de l'administration"><a href="/admin">Vue d'ensemble</a><a href="/admin/projects">Projets</a><a class="is-active" href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a></nav></aside>
+    <div class="admin-main media-library">
+        <header class="admin-header"><div><p class="admin-eyebrow">Administration</p><h1>Médiathèque</h1><p>Centralisez les images, vidéos et documents du portfolio.</p></div><span>@FilteredMedia.Count média(s)</span></header>
+
+        <section class="media-upload-zone" aria-label="Importer des médias">
+            <InputFile OnChange="QueueFilesAsync" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" />
+            <strong>Glissez-déposez vos fichiers ici</strong><span>ou cliquez pour sélectionner plusieurs fichiers</span><small>JPG, PNG, WebP, GIF, MP4, WebM ou PDF — 25 Mo maximum par fichier.</small>
+        </section>
+        @if (uploads.Count > 0) { <section class="media-upload-list" aria-live="polite">@foreach (var upload in uploads) { <article><div><strong>@upload.Name</strong><small>@upload.Status</small></div><progress max="100" value="@upload.Progress">@upload.Progress%</progress>@if (!upload.Completed) { <button type="button" @onclick="() => Cancel(upload)">Annuler</button> }</article> }</section> }
+
+        <section class="media-library-tools" aria-label="Recherche et filtres">
+            <input type="search" placeholder="Rechercher par nom…" @bind="search" @bind:event="oninput" />
+            <select @bind="typeFilter"><option value="">Tous les types</option><option value="image">Images</option><option value="video">Vidéos</option><option value="document">Documents</option></select>
+            <select @bind="projectFilter"><option value="0">Tous les projets</option><option value="-1">Sans projet</option>@foreach (var project in projects.OrderBy(x => x.Title)) { <option value="@project.Id">@project.Title</option> }</select>
+            <select @bind="sort"><option value="recent">Plus récents</option><option value="oldest">Plus anciens</option><option value="name">Nom A–Z</option><option value="size">Taille décroissante</option></select>
+        </section>
+
+        @if (loading) { <div class="admin-project-empty">Chargement de la médiathèque…</div> }
+        else if (!string.IsNullOrWhiteSpace(error)) { <div class="admin-project-empty admin-project-error" role="alert"><p>@error</p><button @onclick="LoadAsync">Réessayer</button></div> }
+        else if (media.Count == 0) { <div class="admin-project-empty">Aucun média enregistré.</div> }
+        else if (FilteredMedia.Count == 0) { <div class="admin-project-empty">Aucun média ne correspond aux filtres.</div> }
+        else { <section class="media-grid">@foreach (var item in FilteredMedia) { <article class="media-card"> <button class="media-card__preview" type="button" @onclick="() => Open(item)">@if (item.MediaType == "image" && ResolveUrl(item.PublicUrl) is { } image) { <img src="@image" alt="@(item.AltText ?? item.OriginalFilename)" loading="lazy" /> } else { <span>@TypeLabel(item.MediaType)</span> }</button><div><span class="media-type">@TypeLabel(item.MediaType)</span><h2 title="@item.OriginalFilename">@item.OriginalFilename</h2><p>@ProjectName(item.ProjectId) · @FormatSize(item.FileSize)</p><button type="button" @onclick="() => Open(item)">Gérer</button></div></article> }</section> }
+    </div>
+</main>
+}
+
+@if (editing is not null)
+{
+<div class="admin-modal-backdrop" @onclick="Close"><section class="admin-project-modal media-edit-modal" role="dialog" aria-modal="true" aria-labelledby="media-edit-title" @onclick:stopPropagation="true">
+    <header><div><p class="admin-eyebrow">Média</p><h2 id="media-edit-title">@editing.OriginalFilename</h2></div><button type="button" aria-label="Fermer" @onclick="Close">×</button></header>
+    @if (editing.MediaType == "image" && ResolveUrl(editing.PublicUrl) is { } preview) { <img class="media-edit-preview" src="@preview" alt="@(editing.AltText ?? editing.OriginalFilename)" /> }
+    <div class="admin-project-form"><label>Texte alternatif<input maxlength="500" @bind="editing.AltText" /></label><label>Légende<textarea maxlength="500" @bind="editing.Caption"></textarea></label><label>Projet associé<select @bind="editing.ProjectId"><option value="">Aucun projet</option>@foreach (var project in projects.OrderBy(x => x.Title)) { <option value="@project.Id">@project.Title</option> }</select></label></div>
+    @if (!string.IsNullOrWhiteSpace(modalError)) { <p class="admin-modal-message is-error" role="alert">@modalError</p> }
+    <footer><button type="button" disabled="@saving" @onclick="CopyUrlAsync">Copier l’URL</button>@if (ResolveUrl(editing.PublicUrl) is { } download) { <a class="admin-secondary-button" href="@download" target="_blank" download="@editing.OriginalFilename">Télécharger</a> }<button class="documentation-editor__danger" disabled="@saving" @onclick="DeleteAsync">Supprimer</button><button class="admin-primary-button" disabled="@saving" @onclick="SaveAsync">@(saving ? "Enregistrement…" : "Enregistrer")</button></footer>
+</section></div>
+}
+
+@code {
+    private readonly List<MediaApiDto> media = []; private readonly List<ProjectApiDto> projects = []; private readonly List<UploadItem> uploads = [];
+    private string search = "", typeFilter = "", sort = "recent", error = "", modalError = ""; private int projectFilter; private bool loading = true, saving; private MediaApiDto? editing;
+    private List<MediaApiDto> FilteredMedia { get { IEnumerable<MediaApiDto> query = media.Where(x => string.IsNullOrWhiteSpace(search) || x.OriginalFilename.Contains(search, StringComparison.OrdinalIgnoreCase)); if (typeFilter.Length > 0) query = query.Where(x => x.MediaType == typeFilter); if (projectFilter == -1) query = query.Where(x => x.ProjectId is null); else if (projectFilter > 0) query = query.Where(x => x.ProjectId == (uint)projectFilter); query = sort switch { "oldest" => query.OrderBy(x => x.CreatedAt), "name" => query.OrderBy(x => x.OriginalFilename), "size" => query.OrderByDescending(x => x.FileSize), _ => query.OrderByDescending(x => x.CreatedAt) }; return query.ToList(); } }
+    protected override async Task OnInitializedAsync() { if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login"); return; } await LoadAsync(); }
+    private async Task LoadAsync() { loading = true; error = ""; try { media.Clear(); media.AddRange(await MediaService.GetAllAsync()); projects.Clear(); projects.AddRange(await ProjectService.GetAllAsync()); } catch { error = "Impossible de charger la médiathèque."; } finally { loading = false; } }
+    private async Task QueueFilesAsync(InputFileChangeEventArgs args) { foreach (var file in args.GetMultipleFiles(20)) { var item = new UploadItem(file.Name); uploads.Insert(0, item); _ = UploadAsync(file, item); } await Task.CompletedTask; }
+    private async Task UploadAsync(IBrowserFile file, UploadItem item) { try { var progress = new Progress<int>(value => { item.Progress = value; InvokeAsync(StateHasChanged); }); var created = await MediaService.UploadAsync(file, null, progress, item.Cancellation.Token); media.Insert(0, created); item.Progress = 100; item.Status = "Terminé"; } catch (OperationCanceledException) { item.Status = "Annulé"; } catch (Exception ex) { item.Status = ex.Message; } finally { item.Completed = true; await InvokeAsync(StateHasChanged); } }
+    private static void Cancel(UploadItem item) => item.Cancellation.Cancel();
+    private void Open(MediaApiDto item) { editing = new MediaApiDto { Id=item.Id, ProjectId=item.ProjectId, MediaType=item.MediaType, OriginalFilename=item.OriginalFilename, StoredFilename=item.StoredFilename, FilePath=item.FilePath, PublicUrl=item.PublicUrl, MimeType=item.MimeType, FileSize=item.FileSize, AltText=item.AltText, Caption=item.Caption, CreatedAt=item.CreatedAt }; modalError = ""; }
+    private void Close() { if (!saving) editing = null; }
+    private async Task SaveAsync() { if (editing is null || saving) return; saving = true; modalError = ""; try { var updated = await MediaService.UpdateAsync(editing.Id, editing); var index = media.FindIndex(x => x.Id == updated.Id); if (index >= 0) media[index] = updated; editing = null; } catch (Exception ex) { modalError = ex.Message; } finally { saving = false; } }
+    private async Task DeleteAsync() { if (editing is null || saving || !await JS.InvokeAsync<bool>("confirm", "Supprimer définitivement ce média ? La suppression sera refusée s’il est utilisé dans une documentation.")) return; saving = true; modalError = ""; try { await MediaService.DeleteAsync(editing.Id); media.RemoveAll(x => x.Id == editing.Id); editing = null; } catch (Exception ex) { modalError = ex.Message; } finally { saving = false; } }
+    private async Task CopyUrlAsync() { var url = ResolveUrl(editing?.PublicUrl); if (url is not null) await JS.InvokeVoidAsync("navigator.clipboard.writeText", url); }
+    private string? ResolveUrl(string? value) { if (string.IsNullOrWhiteSpace(value)) return null; if (Uri.TryCreate(value, UriKind.Absolute, out var absolute)) return absolute.ToString(); return Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root) ? new Uri(root, value).ToString() : null; }
+    private string ProjectName(uint? id) => id is null ? "Sans projet" : projects.FirstOrDefault(x => x.Id == id)?.Title ?? "Projet inconnu";
+    private static string TypeLabel(string value) => value switch { "image" => "Image", "video" => "Vidéo", _ => "Document" };
+    private static string FormatSize(ulong bytes) => bytes >= 1_048_576 ? $"{bytes / 1_048_576d:0.#} Mo" : $"{bytes / 1024d:0.#} Ko";
+    private sealed class UploadItem(string name) { public string Name { get; } = name; public int Progress { get; set; } public string Status { get; set; } = "En attente"; public bool Completed { get; set; } public CancellationTokenSource Cancellation { get; } = new(); }
+}
