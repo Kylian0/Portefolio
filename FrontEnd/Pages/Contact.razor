@@ -1,5 +1,6 @@
 @page "/contact"
 @using System.ComponentModel.DataAnnotations
+@inject IAdminMessageService MessageService
 
 <PageTitle>Contact | Portfolio</PageTitle>
 
@@ -31,9 +32,9 @@
             <div class="contact-socials">
                 <p class="contact-details__label">Me retrouver ailleurs</p>
                 <ul>
-                    <li><span>GitHub</span><a href="https://github.com/" target="_blank" rel="noopener noreferrer">Profil à renseigner <span aria-hidden="true">↗</span></a></li>
-                    <li><span>LinkedIn</span><a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">Profil à renseigner <span aria-hidden="true">↗</span></a></li>
-                    <li><span>E-mail</span><span>Adresse à renseigner</span></li>
+                    <li><span>GitHub</span><a href="https://github.com/Kylian0" target="_blank" rel="noopener noreferrer" aria-label="Consulter le profil GitHub de Kylian">github.com/Kylian0 <span aria-hidden="true">↗</span></a></li>
+                    <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/kylian-garnier-bab6a22b1/" target="_blank" rel="noopener noreferrer" aria-label="Consulter le profil LinkedIn de Kylian">Kylian Garnier <span aria-hidden="true">↗</span></a></li>
+                    <li><span>E-mail</span><a href="mailto:kgarnier.inc@gmail.com">kgarnier.inc@gmail.com</a></li>
                 </ul>
             </div>
         </aside>
@@ -48,8 +49,8 @@
             @if (isSubmitted)
             {
                 <div class="contact-success" role="status">
-                    <strong>Message prêt à partir.</strong>
-                    <span>L'envoi a bien été simulé pour cette démonstration.</span>
+                    <strong>Message envoyé.</strong>
+                    <span>Merci pour votre message, je vous répondrai dès que possible.</span>
                 </div>
             }
 
@@ -83,7 +84,8 @@
                     <ValidationMessage For="@(() => contactForm.Message)" />
                 </div>
 
-                <button class="contact-submit" type="submit">Envoyer le message <span aria-hidden="true">→</span></button>
+                @if (!string.IsNullOrWhiteSpace(errorMessage)) { <p class="validation-message" role="alert">@errorMessage</p> }
+                <button class="contact-submit" type="submit" disabled="@isSending">@(isSending ? "Envoi…" : "Envoyer le message") <span aria-hidden="true">→</span></button>
             </EditForm>
         </section>
     </div>
@@ -92,10 +94,15 @@
 @code {
     private readonly ContactFormModel contactForm = new();
     private bool isSubmitted;
+    private bool isSending;
+    private string? errorMessage;
 
-    private void HandleValidSubmit()
+    private async Task HandleValidSubmit()
     {
-        isSubmitted = true;
+        if (isSending) return; isSending=true;errorMessage=null;
+        try { await MessageService.SendAsync(new AdminMessage{Id=Guid.Empty,SenderName=contactForm.Name,SenderEmail=contactForm.Email,Subject=contactForm.Subject,Content=contactForm.Message,ReceivedAt=default}); isSubmitted=true; }
+        catch { errorMessage="Le message n’a pas pu être envoyé. Réessayez dans quelques instants."; }
+        finally { isSending=false; }
     }
 
     private sealed class ContactFormModel

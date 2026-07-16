@@ -1,13 +1,194 @@
 @inject IConfiguration Configuration
+
 @if (Open)
 {
-<div class="admin-modal-backdrop" @onclick="Cancel"><section class="media-picker-modal" role="dialog" aria-modal="true" @onclick:stopPropagation="true"><header><h2>Sélectionner dans la médiathèque</h2><button type="button" aria-label="Fermer" @onclick="Cancel">×</button></header>
-@if (Available.Count == 0) { <div class="admin-project-empty">Aucun média compatible pour ce projet.</div> } else { <div class="media-picker-grid">@foreach (var item in Available) { <button type="button" class="@(selected.Contains(item.Id) ? "is-selected" : null)" @onclick="() => Toggle(item.Id)">@if (item.MediaType == "image" && Resolve(item.PublicUrl) is { } url) { <img src="@url" alt="@(item.AltText ?? item.OriginalFilename)" /> } else { <span>@item.MediaType</span> }<strong>@item.OriginalFilename</strong></button> }</div> }
-<footer><a href="/admin/media">Gérer tous les médias</a><button type="button" @onclick="Cancel">Annuler</button><button type="button" class="admin-primary-button" disabled="@(selected.Count == 0)" @onclick="Confirm">Insérer</button></footer></section></div>
+    <div class="admin-modal-backdrop media-picker-backdrop" @onclick="Cancel">
+        <section class="media-picker-modal" role="dialog" aria-modal="true" aria-labelledby="media-picker-title" @onclick:stopPropagation="true">
+            <header class="media-picker-modal__header">
+                <div>
+                    <span class="media-picker-modal__eyebrow">Médiathèque</span>
+                    <h2 id="media-picker-title">Composer une galerie</h2>
+                    <p>Sélectionnez une ou plusieurs images à insérer dans la documentation.</p>
+                </div>
+                <button class="media-picker-modal__close" type="button" aria-label="Fermer la médiathèque" @onclick="Cancel">×</button>
+            </header>
+
+            <div class="media-picker-modal__toolbar">
+                <label class="media-picker-search">
+                    <span class="visually-hidden">Rechercher une image</span>
+                    <span aria-hidden="true">⌕</span>
+                    <input type="search" placeholder="Rechercher par nom…" @bind="search" @bind:event="oninput" />
+                </label>
+                <label class="media-picker-filter">
+                    <span class="visually-hidden">Filtrer par projet</span>
+                    <select @bind="projectFilter">
+                        <option value="0">Tous les projets</option>
+                        <option value="-1">Sans projet</option>
+                        @foreach (var project in Projects.OrderBy(item => item.Title))
+                        {
+                            <option value="@project.Id">@project.Title</option>
+                        }
+                    </select>
+                </label>
+                <label class="media-picker-filter">
+                    <span class="visually-hidden">Trier les images</span>
+                    <select @bind="sort">
+                        <option value="recent">Plus récentes</option>
+                        <option value="oldest">Plus anciennes</option>
+                        <option value="name">Nom A–Z</option>
+                        <option value="size">Taille décroissante</option>
+                    </select>
+                </label>
+                <span class="media-picker-count" aria-live="polite">
+                    @selected.Count @(selected.Count > 1 ? "images sélectionnées" : "image sélectionnée")
+                </span>
+            </div>
+
+            <div class="media-picker-modal__content">
+                @if (Available.Count == 0)
+                {
+                    <div class="media-picker-empty">
+                        <span aria-hidden="true">▧</span>
+                        <strong>@(string.IsNullOrWhiteSpace(search) ? "Aucune image disponible" : "Aucun résultat")</strong>
+                        <p>@(string.IsNullOrWhiteSpace(search) ? "Ajoutez d’abord des images dans la médiathèque." : "Essayez avec un autre nom de fichier.")</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="media-picker-grid">
+                        @foreach (var item in Available)
+                        {
+                            var isSelected = selected.Contains(item.Id);
+                            <button type="button"
+                                    class="media-picker-card @(isSelected ? "is-selected" : null)"
+                                    aria-pressed="@isSelected"
+                                    @onclick="() => Toggle(item.Id)">
+                                <span class="media-picker-card__preview">
+                                    @if (ResolveMediaUrl(item) is { } url)
+                                    {
+                                        <img src="@url" alt="@(item.AltText ?? item.OriginalFilename)" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <span class="media-picker-card__fallback" aria-hidden="true">Image indisponible</span>
+                                    }
+                                    <span class="media-picker-card__check" aria-hidden="true">✓</span>
+                                </span>
+                                <span class="media-picker-card__details">
+                                    <strong title="@item.OriginalFilename">@item.OriginalFilename</strong>
+                                    <small>@FormatFileSize(item.FileSize)</small>
+                                </span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <footer class="media-picker-modal__footer">
+                <a href="/admin/media">Gérer la médiathèque</a>
+                <div>
+                    <button type="button" class="media-picker-secondary" @onclick="Cancel">Annuler</button>
+                    <button type="button" class="admin-primary-button" disabled="@(selected.Count == 0)" @onclick="Confirm">
+                        Insérer @(selected.Count > 0 ? $"({selected.Count})" : string.Empty)
+                    </button>
+                </div>
+            </footer>
+        </section>
+    </div>
 }
+
 @code {
- [Parameter] public bool Open { get; set; } [Parameter] public IReadOnlyList<MediaApiDto> Media { get; set; } = []; [Parameter] public string MediaType { get; set; } = "image"; [Parameter] public bool Multiple { get; set; } [Parameter] public EventCallback<IReadOnlyList<MediaApiDto>> OnSelected { get; set; } [Parameter] public EventCallback OnCancelled { get; set; }
- private readonly HashSet<uint> selected=[]; private List<MediaApiDto> Available => Media.Where(x=>x.MediaType==MediaType).ToList();
- private void Toggle(uint id){if(!Multiple)selected.Clear();if(!selected.Add(id))selected.Remove(id);} private async Task Confirm(){await OnSelected.InvokeAsync(Available.Where(x=>selected.Contains(x.Id)).ToArray());selected.Clear();} private async Task Cancel(){selected.Clear();await OnCancelled.InvokeAsync();}
- private string? Resolve(string? value){if(string.IsNullOrWhiteSpace(value))return null;if(Uri.TryCreate(value,UriKind.Absolute,out var absolute))return absolute.ToString();return Uri.TryCreate(Configuration["Api:BaseUrl"],UriKind.Absolute,out var root)?new Uri(root,value).ToString():null;}
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public IReadOnlyList<MediaApiDto> Media { get; set; } = [];
+    [Parameter] public IReadOnlyList<ProjectApiDto> Projects { get; set; } = [];
+    [Parameter] public string MediaType { get; set; } = "image";
+    [Parameter] public bool Multiple { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<MediaApiDto>> OnSelected { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private readonly HashSet<uint> selected = [];
+    private string search = string.Empty;
+    private int projectFilter;
+    private string sort = "recent";
+
+    private List<MediaApiDto> Available
+    {
+        get
+        {
+            IEnumerable<MediaApiDto> query = Media
+                .Where(item => item.MediaType == MediaType)
+                .Where(item => string.IsNullOrWhiteSpace(search)
+                    || item.OriginalFilename.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)
+                    || (item.AltText?.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false));
+
+            if (projectFilter == -1) query = query.Where(item => item.ProjectId is null);
+            else if (projectFilter > 0) query = query.Where(item => item.ProjectId == (uint)projectFilter);
+
+            query = sort switch
+            {
+                "oldest" => query.OrderBy(item => item.CreatedAt),
+                "name" => query.OrderBy(item => item.OriginalFilename),
+                "size" => query.OrderByDescending(item => item.FileSize),
+                _ => query.OrderByDescending(item => item.CreatedAt)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private void Toggle(uint id)
+    {
+        if (!Multiple)
+        {
+            selected.Clear();
+        }
+
+        if (!selected.Add(id))
+        {
+            selected.Remove(id);
+        }
+    }
+
+    private async Task Confirm()
+    {
+        var chosen = Media.Where(item => selected.Contains(item.Id)).ToArray();
+        await OnSelected.InvokeAsync(chosen);
+        Reset();
+    }
+
+    private async Task Cancel()
+    {
+        Reset();
+        await OnCancelled.InvokeAsync();
+    }
+
+    private void Reset()
+    {
+        selected.Clear();
+        search = string.Empty;
+        projectFilter = 0;
+        sort = "recent";
+    }
+
+    private string? ResolveMediaUrl(MediaApiDto item) => Resolve(item.PublicUrl) ?? Resolve(item.FilePath);
+
+    private string? Resolve(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        value = value.Trim().Replace('\\', '/');
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https") return absolute.ToString();
+        if (!Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root)) return null;
+        var publicPath = value.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase)
+            ? "/" + value.TrimStart('/')
+            : null;
+        return publicPath is null ? null : new Uri(root, publicPath).ToString();
+    }
+
+    private static string FormatFileSize(ulong bytes) => bytes switch
+    {
+        >= 1_048_576 => $"{bytes / 1_048_576d:0.#} Mo",
+        >= 1_024 => $"{bytes / 1_024d:0.#} Ko",
+        _ => $"{bytes} o"
+    };
 }

@@ -29,6 +29,13 @@ public sealed class ProjectApiService(HttpClient httpClient) : IProjectApiServic
             ?? throw new ProjectApiException("La réponse de l'API est vide.");
     }
 
+    public async Task<ProjectApiDto> CreateAsync(ProjectApiDto project, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/projects", project, cancellationToken);
+        if (!response.IsSuccessStatusCode) throw await CreateExceptionAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ProjectApiDto>(cancellationToken: cancellationToken) ?? throw new ProjectApiException("La réponse de l'API est vide.");
+    }
+
     public async Task DeleteAsync(uint id, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.DeleteAsync($"api/projects/{id}", cancellationToken);

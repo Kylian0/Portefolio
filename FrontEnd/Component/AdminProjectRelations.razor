@@ -1,0 +1,105 @@
+@inject IProjectTechnologyApiService TechnologyApi
+@inject IProjectLearningApiService LearningApi
+@inject IJSRuntime JS
+
+<section class="admin-related-editor">
+    @if (Section == "technologies")
+    {
+        <h3>Technologies du projet</h3>
+        <div class="admin-related-add">
+            <select aria-label="Technologie à associer" value="@newTechnologyId" @onchange="SelectTechnology">
+                <option value="0">Choisir une technologie</option>
+                @foreach (var group in AvailableTechnologies.GroupBy(item => item.CategoryName ?? "Sans catégorie").OrderBy(group => group.Key))
+                {
+                    <optgroup label="@group.Key">
+                        @foreach (var item in group.OrderBy(item => item.Name))
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+            <label><input type="checkbox" @bind="newPrimary" /> Principale</label>
+            <button type="button" class="admin-primary-button" disabled="@(newTechnologyId == 0 || isSubmitting)" @onclick="AddTechnology">@(isSubmitting ? "Association…" : "Associer")</button>
+        </div>
+        @if (relations.Count == 0)
+        {
+            <p class="admin-related-empty">Aucune technologie n’est encore associée à ce projet.</p>
+        }
+        else
+        {
+            <div class="admin-relation-list">
+                @foreach (var item in relations.OrderByDescending(item => item.IsPrimary).ThenBy(item => item.DisplayOrder).ThenBy(item => item.TechnologyName))
+                {
+                    <article>
+                        <strong>@item.TechnologyName</strong>
+                        <label><input type="checkbox" @bind="item.IsPrimary" /> Principale</label>
+                        <label class="admin-relation-order"><span>Ordre</span><input type="number" min="0" @bind="item.DisplayOrder" /></label>
+                        <button type="button" disabled="@isSubmitting" @onclick="() => SaveRelation(item)">Enregistrer</button>
+                        <button type="button" class="admin-danger-button" disabled="@isSubmitting" @onclick="() => RemoveRelation(item)">Retirer</button>
+                    </article>
+                }
+            </div>
+        }
+    }
+    else if (Section == "learnings")
+    {
+        <h3>Apprentissages</h3>
+        <div class="admin-related-add"><textarea maxlength="500" placeholder="Ce que j’ai appris…" @bind="newLearning"></textarea><input type="number" min="0" @bind="newLearningOrder" /><button type="button" @onclick="AddLearning">Ajouter</button></div>
+        <div class="admin-relation-list">@foreach (var item in learnings) { <article><textarea maxlength="500" @bind="item.Content"></textarea><input type="number" min="0" @bind="item.DisplayOrder" /><button type="button" @onclick="() => SaveLearning(item)">Enregistrer</button><button type="button" class="admin-danger-button" @onclick="() => DeleteLearning(item)">Supprimer</button></article> }</div>
+    }
+    @if (error is not null) { <p class="admin-modal-message is-error">@error</p> }
+</section>
+
+@code {
+    [Parameter] public uint ProjectId { get; set; }
+    [Parameter] public string Section { get; set; } = "";
+    [Parameter] public IReadOnlyList<TechnologyApiDto> Catalog { get; set; } = [];
+    [Parameter] public EventCallback OnTechnologiesChanged { get; set; }
+    private readonly List<ProjectTechnologyApiDto> relations = [];
+    private readonly List<ProjectLearningApiDto> learnings = [];
+    private IEnumerable<TechnologyApiDto> AvailableTechnologies => Catalog.Where(item => relations.All(relation => relation.TechnologyId != item.Id));
+    private uint loadedProject; private string loadedSection = ""; private uint newTechnologyId; private bool newPrimary; private string newLearning = ""; private int newLearningOrder; private string? error; private bool isSubmitting;
+
+    protected override async Task OnParametersSetAsync() { if (loadedProject == ProjectId && loadedSection == Section) return; loadedProject = ProjectId; loadedSection = Section; await Load(); }
+    private async Task Load() { error = null; try { if (Section == "technologies") { relations.Clear(); relations.AddRange((await TechnologyApi.GetByProjectIdAsync(ProjectId)).Select(CopyRelation)); } else if (Section == "learnings") { learnings.Clear(); learnings.AddRange((await LearningApi.GetByProjectIdAsync(ProjectId)).Select(item => new ProjectLearningApiDto { Id = item.Id, ProjectId = item.ProjectId, Content = item.Content, DisplayOrder = item.DisplayOrder })); } } catch { error = "Impossible de charger les données liées."; } }
+    private void SelectTechnology(ChangeEventArgs args)
+    {
+        newTechnologyId = uint.TryParse(args.Value?.ToString(), out var technologyId) ? technologyId : 0;
+        error = null;
+    }
+
+    private async Task AddTechnology()
+    {
+        if (newTechnologyId == 0 || isSubmitting) return;
+        isSubmitting = true;
+        error = null;
+        try
+        {
+            await TechnologyApi.AddToProjectAsync(new() { ProjectId = ProjectId, TechnologyId = newTechnologyId, IsPrimary = newPrimary, DisplayOrder = relations.Count });
+            newTechnologyId = 0;
+            newPrimary = false;
+            await ReloadTechnologies();
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            error = "Votre session administrateur a expiré. Reconnectez-vous avant d’associer une technologie.";
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            error = "Cette technologie est déjà associée au projet.";
+        }
+        catch
+        {
+            error = "Impossible d’associer cette technologie.";
+        }
+        finally { isSubmitting = false; }
+    }
+    private async Task SaveRelation(ProjectTechnologyApiDto item) { if (isSubmitting) return; isSubmitting = true; try { await TechnologyApi.UpdateProjectTechnologyAsync(item); error = null; await ReloadTechnologies(); } catch { error = "Impossible de modifier l’association."; } finally { isSubmitting = false; } }
+    private async Task RemoveRelation(ProjectTechnologyApiDto item) { if (isSubmitting || !await JS.InvokeAsync<bool>("confirm", $"Retirer {item.TechnologyName} du projet ?")) return; isSubmitting = true; try { await TechnologyApi.RemoveFromProjectAsync(ProjectId, item.TechnologyId); await ReloadTechnologies(); } catch { error = "Impossible de retirer cette technologie."; } finally { isSubmitting = false; } }
+    private async Task ReloadTechnologies() { loadedProject = ProjectId; loadedSection = Section; await Load(); await OnTechnologiesChanged.InvokeAsync(); }
+    private async Task AddLearning() { if (string.IsNullOrWhiteSpace(newLearning)) return; try { await LearningApi.SaveAsync(new() { ProjectId = ProjectId, Content = newLearning, DisplayOrder = newLearningOrder }); newLearning = ""; newLearningOrder = learnings.Count + 1; loadedSection = ""; await Load(); } catch { error = "Impossible d’ajouter l’apprentissage."; } }
+    private async Task SaveLearning(ProjectLearningApiDto item) { try { await LearningApi.SaveAsync(item); error = null; } catch { error = "Impossible de modifier l’apprentissage."; } }
+    private async Task DeleteLearning(ProjectLearningApiDto item) { if (!await JS.InvokeAsync<bool>("confirm", "Supprimer cet apprentissage ?")) return; await LearningApi.DeleteAsync(item.Id); loadedSection = ""; await Load(); }
+    private static ProjectTechnologyApiDto CopyRelation(ProjectTechnologyApiDto item) => new() { ProjectId = item.ProjectId, ProjectTitle = item.ProjectTitle, ProjectSlug = item.ProjectSlug, TechnologyId = item.TechnologyId, TechnologyName = item.TechnologyName, TechnologySlug = item.TechnologySlug, CategoryId = item.CategoryId, CategoryName = item.CategoryName, IsPrimary = item.IsPrimary, DisplayOrder = item.DisplayOrder };
+}

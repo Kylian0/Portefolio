@@ -1,0 +1,93 @@
+@page "/admin/technologies"
+@inject IAdminAccessService AdminAccess
+@inject IProjectTechnologyApiService Api
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Technologies | Administration</PageTitle>
+
+@if (AdminAccess.IsAuthenticated)
+{
+    <main class="admin-dashboard">
+        <aside class="admin-sidebar">
+            <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
+            <nav aria-label="Navigation de l'administration"><a href="/admin">Vue d'ensemble</a><a href="/admin/projects">Projets</a><a class="is-active" href="/admin/technologies">Technologies</a><a href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a></nav>
+        </aside>
+        <div class="admin-main admin-technologies">
+            <header class="admin-header"><div><p class="admin-eyebrow">Administration</p><h1>Technologies</h1><p>Organisez le catalogue par catégories.</p></div><button class="admin-primary-button" @onclick="NewCategory">Nouvelle catégorie</button></header>
+            @if (error is not null) { <p class="admin-modal-message is-error" role="alert">@error</p> }
+            @if (loading) { <div class="admin-project-empty">Chargement des technologies…</div> }
+            else if (categories.Count == 0) { <div class="admin-project-empty">Aucune catégorie. Créez-en une pour commencer.</div> }
+            else
+            {
+                <details class="admin-panel admin-category-management">
+                    <summary><span><strong>Catégories</strong><small>@categories.Count catégorie(s) · les catégories vides sont incluses</small></span><span class="admin-accordion-indicator" aria-hidden="true"></span></summary>
+                    <div class="admin-category-list">
+                        @foreach (var category in categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                        {
+                            var technologyCount = technologies.Count(x => x.CategoryId == category.Id);
+                            <article><div><strong>@category.Name</strong><small>@category.Slug · ordre @category.DisplayOrder · @technologyCount technologie(s)</small></div><div><button class="admin-tech-action admin-tech-action--add" @onclick="() => NewTechnology(category.Id)"><span aria-hidden="true">+</span> Ajouter une technologie</button><button class="admin-tech-action" @onclick="() => EditCategory(category)">Modifier</button><button class="admin-tech-action admin-tech-action--danger" @onclick="() => DeleteCategory(category)">Supprimer</button></div></article>
+                        }
+                    </div>
+                </details>
+
+                <div class="admin-technology-section-heading"><div><p class="admin-eyebrow">Catalogue</p><h2>Technologies par catégorie</h2><p>Seules les catégories contenant des technologies apparaissent ci-dessous.</p></div></div>
+                <section class="admin-technology-accordions" aria-label="Catégories de technologies">
+                    @foreach (var category in categories.Where(category => technologies.Any(technology => technology.CategoryId == category.Id)).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                    {
+                        var categoryTechnologies = technologies.Where(x => x.CategoryId == category.Id).OrderBy(x => x.Name).ToList();
+                        <details class="admin-technology-category">
+                            <summary><span><strong>@category.Name</strong><small>@categoryTechnologies.Count technologie(s)</small></span><span class="admin-accordion-indicator" aria-hidden="true"></span></summary>
+                            <div class="admin-technology-category__body">
+                                <div class="admin-technology-category__actions"><span>@categoryTechnologies.Count technologie(s)</span><button class="admin-tech-action admin-tech-action--add" @onclick="() => NewTechnology(category.Id)"><span aria-hidden="true">+</span> Ajouter une technologie</button></div>
+                                    <div class="admin-technology-items">
+                                        @foreach (var item in categoryTechnologies)
+                                        {
+                                            <details class="admin-technology-item">
+                                                <summary><span><strong>@item.Name</strong><small>@item.Slug</small></span><span class="admin-accordion-indicator" aria-hidden="true"></span></summary>
+                                                <div class="admin-technology-item__body">
+                                                    <dl><div><dt>Icône</dt><dd>@(item.IconUrl ?? "Non renseignée")</dd></div><div><dt>Site officiel</dt><dd>@(item.OfficialUrl ?? "Non renseigné")</dd></div></dl>
+                                                    <div><button class="admin-tech-action" @onclick="() => EditTechnology(item)">Modifier</button><button class="admin-tech-action admin-tech-action--danger" @onclick="() => DeleteTechnology(item)">Supprimer</button></div>
+                                                </div>
+                                            </details>
+                                        }
+                                    </div>
+                            </div>
+                        </details>
+                    }
+                </section>
+            }
+        </div>
+    </main>
+}
+
+@if (categoryEdit is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseCategory"><section class="admin-project-modal" role="dialog" aria-modal="true" @onclick:stopPropagation="true"><header><h2>@(categoryEdit.Id == 0 ? "Nouvelle catégorie" : "Modifier la catégorie")</h2><button @onclick="CloseCategory">×</button></header><div class="admin-project-form"><label>Nom<input maxlength="100" @bind="categoryEdit.Name" /></label><label>Slug<input maxlength="100" @bind="categoryEdit.Slug" /></label><label>Ordre<input type="number" min="0" @bind="categoryEdit.DisplayOrder" /></label></div><footer><button class="admin-primary-button" @onclick="SaveCategory">Enregistrer</button></footer></section></div>
+}
+@if (technologyEdit is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseTechnology"><section class="admin-project-modal" role="dialog" aria-modal="true" @onclick:stopPropagation="true"><header><h2>@(technologyEdit.Id == 0 ? "Nouvelle technologie" : "Modifier la technologie")</h2><button @onclick="CloseTechnology">×</button></header><div class="admin-project-form"><label>Catégorie<select @bind="technologyEdit.CategoryId">@foreach (var category in categories.OrderBy(x => x.Name)) { <option value="@category.Id">@category.Name</option> }</select></label><label>Nom<input maxlength="100" @bind="technologyEdit.Name" /></label><label>Slug<input maxlength="100" @bind="technologyEdit.Slug" /></label><label>URL de l’icône<input maxlength="500" @bind="technologyEdit.IconUrl" /></label><label>URL officielle<input maxlength="500" @bind="technologyEdit.OfficialUrl" /></label></div><footer><button class="admin-primary-button" @onclick="SaveTechnology">Enregistrer</button></footer></section></div>
+}
+
+@code {
+    private readonly List<TechnologyCategoryApiDto> categories = [];
+    private readonly List<TechnologyApiDto> technologies = [];
+    private TechnologyCategoryApiDto? categoryEdit;
+    private TechnologyApiDto? technologyEdit;
+    private string? error;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync() { await AdminAccess.InitializeAsync(); if (!AdminAccess.IsAuthenticated) { Navigation.NavigateTo("/admin/login"); return; } await Load(); }
+    private async Task Load() { loading = true; error = null; try { categories.Clear(); categories.AddRange(await Api.GetCategoriesAsync()); technologies.Clear(); technologies.AddRange(await Api.GetAllAsync()); } catch { error = "Impossible de charger les technologies."; } finally { loading = false; } }
+    private void NewCategory() => categoryEdit = new();
+    private void EditCategory(TechnologyCategoryApiDto x) => categoryEdit = new() { Id = x.Id, Name = x.Name, Slug = x.Slug, DisplayOrder = x.DisplayOrder };
+    private void CloseCategory() => categoryEdit = null;
+    private async Task SaveCategory() { try { await Api.SaveCategoryAsync(categoryEdit!); categoryEdit = null; await Load(); } catch (Exception ex) { error = ex.Message; } }
+    private async Task DeleteCategory(TechnologyCategoryApiDto x) { if (!await JS.InvokeAsync<bool>("confirm", $"Supprimer la catégorie {x.Name} ?")) return; try { await Api.DeleteCategoryAsync(x.Id); await Load(); } catch { error = "Cette catégorie est encore utilisée et ne peut pas être supprimée."; } }
+    private void NewTechnology(uint categoryId) => technologyEdit = new() { CategoryId = categoryId };
+    private void EditTechnology(TechnologyApiDto x) => technologyEdit = new() { Id = x.Id, CategoryId = x.CategoryId, Name = x.Name, Slug = x.Slug, IconUrl = x.IconUrl, OfficialUrl = x.OfficialUrl };
+    private void CloseTechnology() => technologyEdit = null;
+    private async Task SaveTechnology() { try { await Api.SaveTechnologyAsync(technologyEdit!); technologyEdit = null; await Load(); } catch (Exception ex) { error = ex.Message; } }
+    private async Task DeleteTechnology(TechnologyApiDto x) { if (!await JS.InvokeAsync<bool>("confirm", $"Supprimer la technologie {x.Name} ?")) return; try { await Api.DeleteTechnologyAsync(x.Id); await Load(); } catch { error = "Cette technologie est encore utilisée par un projet."; } }
+}

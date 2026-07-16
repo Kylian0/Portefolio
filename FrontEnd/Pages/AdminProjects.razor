@@ -2,6 +2,8 @@
 @inject IAdminAccessService AdminAccess
 @inject IProjectApiService ProjectApiService
 @inject IProjectTechnologyApiService TechnologyApiService
+@inject IMediaApiService MediaApiService
+@inject IConfiguration Configuration
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
@@ -13,14 +15,14 @@
         <aside class="admin-sidebar">
             <a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a>
             <nav aria-label="Navigation de l'administration">
-                <a href="/admin">Vue d'ensemble</a><a class="is-active" href="/admin/projects">Projets</a><a href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a>
+                <a href="/admin">Vue d'ensemble</a><a class="is-active" href="/admin/projects">Projets</a><a href="/admin/technologies">Technologies</a><a href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a>
             </nav>
         </aside>
 
         <div class="admin-main">
             <header class="admin-header admin-projects-header">
                 <div><p class="admin-eyebrow">Administration</p><h1>Gestion des projets</h1></div>
-                <span>@FilteredProjects.Count projet(s)</span>
+                <div><span>@FilteredProjects.Count projet(s)</span><button type="button" class="admin-primary-button" @onclick="OpenCreateProject">Nouveau projet</button></div>
             </header>
 
             <section class="admin-project-tools" aria-label="Recherche et filtres">
@@ -98,31 +100,86 @@
 {
     <div class="admin-modal-backdrop" @onclick="CloseProject">
         <section class="admin-project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title" @onclick:stopPropagation="true">
-            <header><div><p class="admin-eyebrow">Modifier le projet</p><h2 id="project-modal-title">@selectedProject.Title</h2></div><button type="button" aria-label="Fermer" disabled="@isSubmitting" @onclick="CloseProject">×</button></header>
-            <div class="admin-project-form">
-                <div class="form-field"><label for="project-title">Titre</label><input id="project-title" maxlength="200" @bind="selectedProject.Title" /></div>
-                <div class="form-field"><label for="project-slug">Slug</label><input id="project-slug" maxlength="200" @bind="selectedProject.Slug" /></div>
-                <div class="form-field"><label for="project-description">Description courte</label><textarea id="project-description" maxlength="500" rows="4" @bind="selectedProject.ShortDescription"></textarea></div>
-                <div class="form-field"><label for="project-image">URL de l'image</label><input id="project-image" maxlength="500" @bind="selectedProject.ThumbnailUrl" /></div>
-                <div class="form-field"><label for="project-repository">URL du dépôt</label><input id="project-repository" maxlength="500" @bind="selectedProject.RepositoryUrl" /></div>
-                <div class="form-field"><label for="project-demo">URL de démonstration</label><input id="project-demo" maxlength="500" @bind="selectedProject.DemoUrl" /></div>
-                <div class="form-field"><label for="project-status">Statut</label><select id="project-status" @bind="selectedProject.Status">@foreach (var status in statuses) { <option value="@status">@GetStatusLabel(status)</option> }</select></div>
-                <div class="form-field"><label for="project-order">Ordre d'affichage</label><input id="project-order" type="number" @bind="selectedProject.DisplayOrder" /></div>
-                <div class="form-field"><label for="project-started">Date de début</label><input id="project-started" type="date" @bind="selectedProject.StartedAt" /></div>
-                <div class="form-field"><label for="project-completed">Date de fin</label><input id="project-completed" type="date" @bind="selectedProject.CompletedAt" /></div>
-                <div class="form-field"><label for="project-published">Date de publication</label><input id="project-published" type="datetime-local" @bind="selectedProject.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm" /></div>
-                <label class="admin-project-featured"><input type="checkbox" @bind="selectedProject.IsFeatured" /><span>Mettre ce projet en avant</span></label>
-            </div>
-            @if (modalErrors.Count > 0) { <div class="admin-modal-errors" role="alert">@foreach (var error in modalErrors) { <p>@error</p> }</div> }
+            <header class="admin-project-modal__header">
+                <div><p class="admin-eyebrow">@(selectedProject.Id == 0 ? "Création" : "Modification")</p><h2 id="project-modal-title">@(string.IsNullOrWhiteSpace(selectedProject.Title) ? "Nouveau projet" : selectedProject.Title)</h2><p>Renseignez les informations visibles dans le portfolio.</p></div>
+                <button type="button" class="admin-project-modal__close" aria-label="Fermer" disabled="@isSubmitting" @onclick="CloseProject">×</button>
+            </header>
+            <div class="admin-project-modal__body">
+                @if (modalErrors.Count > 0) { <div class="admin-modal-errors" role="alert"><strong>Enregistrement impossible</strong>@foreach (var error in modalErrors) { <p>@error</p> }</div> }
+                <form id="admin-project-edit-form" class="admin-project-form" @onsubmit="SaveProjectAsync" @onsubmit:preventDefault="true">
+                    <section class="admin-project-form__section">
+                        <header><span>01</span><div><h3>Informations principales</h3><p>Identité et présentation du projet.</p></div></header>
+                        <div class="admin-project-form__grid">
+                            <div class="form-field"><label for="project-title">Titre <span aria-hidden="true">*</span></label><input id="project-title" maxlength="200" autocomplete="off" placeholder="Nom du projet" @bind="selectedProject.Title" /></div>
+                            <div class="form-field"><label for="project-slug">Slug <span aria-hidden="true">*</span></label><input id="project-slug" maxlength="200" autocomplete="off" placeholder="nom-du-projet" @bind="selectedProject.Slug" /><small>Utilisé dans l’adresse de la page.</small></div>
+                            <div class="form-field form-field--wide"><label for="project-description">Description courte <span aria-hidden="true">*</span></label><textarea id="project-description" maxlength="500" rows="4" placeholder="Présentez le projet en quelques phrases…" @bind="selectedProject.ShortDescription"></textarea><small>@selectedProject.ShortDescription.Length / 500 caractères</small></div>
+                        </div>
+                    </section>
+
+                    <section class="admin-project-form__section">
+                        <header><span>02</span><div><h3>Liens et visibilité</h3><p>Visuel, accès externes et publication.</p></div></header>
+                        <div class="admin-project-form__grid">
+                            <div class="form-field form-field--wide">
+                                <label for="project-image">Image de couverture</label>
+                                <div class="admin-project-cover-editor">
+                                    <div class="admin-project-cover-editor__preview">
+                                        @if (!string.IsNullOrWhiteSpace(thumbnailPreviewUrl ?? selectedProject.ThumbnailUrl))
+                                        {
+                                            <img src="@(thumbnailPreviewUrl ?? selectedProject.ThumbnailUrl)" alt="Aperçu de la couverture" />
+                                        }
+                                        else
+                                        {
+                                            <span>Aucune image</span>
+                                        }
+                                    </div>
+                                    <div class="admin-project-cover-editor__controls">
+                                        <InputFile id="project-cover-file" OnChange="SelectCoverImageAsync" accept="image/jpeg,image/png,image/webp,image/gif" disabled="@isUploadingThumbnail" />
+                                        <label for="project-cover-file" class="admin-secondary-button">@(isUploadingThumbnail ? "Envoi en cours…" : "Choisir une image")</label>
+                                        <small>JPG, PNG, WebP ou GIF — 25 Mo maximum. Le fichier sera ajouté à la médiathèque.</small>
+                                        @if (isUploadingThumbnail) { <progress max="100" value="@thumbnailUploadProgress">@thumbnailUploadProgress%</progress> }
+                                        @if (!string.IsNullOrWhiteSpace(thumbnailUploadMessage)) { <p class="@(thumbnailUploadFailed ? "is-error" : "is-success")" role="status">@thumbnailUploadMessage</p> }
+                                    </div>
+                                </div>
+                                <details class="admin-project-cover-url"><summary>Utiliser une URL manuellement</summary><input id="project-image" type="url" maxlength="500" placeholder="https://…" @bind="selectedProject.ThumbnailUrl" /></details>
+                            </div>
+                            <div class="form-field"><label for="project-repository">Dépôt Git</label><input id="project-repository" type="url" maxlength="500" placeholder="https://github.com/…" @bind="selectedProject.RepositoryUrl" /></div>
+                            <div class="form-field"><label for="project-demo">Démonstration</label><input id="project-demo" type="url" maxlength="500" placeholder="https://…" @bind="selectedProject.DemoUrl" /></div>
+                            <div class="form-field"><label for="project-status">Statut</label><select id="project-status" @bind="selectedProject.Status">@foreach (var status in statuses) { <option value="@status">@GetStatusLabel(status)</option> }</select></div>
+                            <div class="form-field"><label for="project-order">Ordre d’affichage</label><input id="project-order" type="number" min="0" @bind="selectedProject.DisplayOrder" /></div>
+                            <label class="admin-project-featured form-field--wide"><input type="checkbox" @bind="selectedProject.IsFeatured" /><span><strong>Mettre en avant</strong><small>Le projet pourra être davantage valorisé dans le portfolio.</small></span></label>
+                        </div>
+                    </section>
+
+                    <section class="admin-project-form__section">
+                        <header><span>03</span><div><h3>Planification</h3><p>Dates clés du projet et de sa publication.</p></div></header>
+                        <div class="admin-project-form__grid admin-project-form__grid--dates">
+                            <div class="form-field"><label for="project-started">Date de début</label><input id="project-started" type="date" @bind="selectedProject.StartedAt" /></div>
+                            <div class="form-field"><label for="project-completed">Date de fin</label><input id="project-completed" type="date" @bind="selectedProject.CompletedAt" /></div>
+                            <div class="form-field"><label for="project-published">Publication</label><input id="project-published" type="datetime-local" @bind="selectedProject.PublishedAt" @bind:format="yyyy-MM-ddTHH:mm" /></div>
+                        </div>
+                    </section>
+                </form>
             @if (!string.IsNullOrEmpty(modalMessage)) { <p class="admin-modal-message" role="status">@modalMessage</p> }
-            <nav class="admin-related-links" aria-label="Données liées au projet">
-                <a href="@($"/projects/{selectedProject.Slug}?admin=true")">Documentation</a>
-                <button type="button" @onclick="ShowTechnologiesMessage">Technologies</button>
-                <button type="button" @onclick="ShowMediaMessage">Médias</button>
-                <button type="button" @onclick="ShowLearningsMessage">Apprentissages</button>
-            </nav>
-            <p class="admin-delete-warning">La suppression peut également supprimer les documents, blocs, médias, technologies associées et apprentissages liés au projet.</p>
-            <footer><button type="button" class="admin-danger-button" disabled="@isSubmitting" @onclick="DeleteProjectAsync">Supprimer</button><button type="button" class="admin-primary-button" disabled="@isSubmitting" @onclick="SaveProjectAsync">@(isSubmitting ? "Enregistrement…" : "Enregistrer")</button></footer>
+                @if (selectedProject.Id != 0)
+                {
+                    <section class="admin-project-form__section admin-project-form__section--related">
+                        <header><span>04</span><div><h3>Contenu associé</h3><p>Gérez les informations complémentaires du projet.</p></div></header>
+                        <nav class="admin-related-links" aria-label="Données liées au projet">
+                            <a href="@($"/projects/{selectedProject.Slug}?admin=true")">Documentation</a>
+                            <button type="button" @onclick="ShowMediaMessage">Médias</button>
+                            <button type="button" class="@(relatedSection == "learnings" ? "is-active" : null)" @onclick="ToggleLearnings">Apprentissages</button>
+                        </nav>
+                        <AdminProjectRelations ProjectId="selectedProject.Id" Section="technologies" Catalog="technologyCatalog" OnTechnologiesChanged="RefreshSelectedProjectTechnologiesAsync" />
+                        @if (relatedSection == "learnings") { <AdminProjectRelations ProjectId="selectedProject.Id" Section="learnings" Catalog="technologyCatalog" /> }
+                    </section>
+                    <p class="admin-delete-warning"><strong>Attention :</strong> supprimer le projet supprimera également certaines données liées.</p>
+                }
+            </div>
+            <footer class="admin-project-modal__footer">
+                @if (selectedProject.Id != 0) { <button type="button" class="admin-danger-button" disabled="@isSubmitting" @onclick="DeleteProjectAsync">Supprimer le projet</button> }
+                <button type="button" class="admin-secondary-button" disabled="@isSubmitting" @onclick="CloseProject">Annuler</button>
+                <button type="submit" form="admin-project-edit-form" class="admin-primary-button" disabled="@(isSubmitting || isUploadingThumbnail)">@(isSubmitting ? "Enregistrement…" : selectedProject.Id == 0 ? "Créer le projet" : "Enregistrer")</button>
+            </footer>
         </section>
     </div>
 }
@@ -142,9 +199,16 @@
     private ProjectApiDto? selectedProject;
     private string searchTerm = string.Empty;
     private string? modalMessage;
+    private string? relatedSection;
     private bool filtersOpen;
     private bool isLoading = true;
     private bool isSubmitting;
+    private bool isUploadingThumbnail;
+    private bool thumbnailUploadFailed;
+    private int thumbnailUploadProgress;
+    private string? thumbnailUploadMessage;
+    private string? thumbnailPreviewUrl;
+    private IBrowserFile? pendingThumbnailFile;
 
     private List<ProjectApiDto> FilteredProjects => projects.Where(project =>
         (string.IsNullOrWhiteSpace(searchTerm) || project.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.Slug.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || project.ShortDescription.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
@@ -180,6 +244,12 @@
         catch { technologiesByProject[project.Id] = []; }
     }
 
+    private async Task RefreshSelectedProjectTechnologiesAsync()
+    {
+        if (selectedProject is null) return;
+        await LoadProjectTechnologiesAsync(selectedProject);
+    }
+
     private IReadOnlyList<ProjectTechnologyApiDto> GetProjectTechnologies(uint projectId) => technologiesByProject.GetValueOrDefault(projectId) ?? [];
     private IReadOnlyList<TechnologyApiDto> GetCatalogTechnologies(uint categoryId) => technologyCatalog.Where(item => item.CategoryId == categoryId).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     private bool MatchesTechnologyFilters(uint projectId) { if (selectedCategoryIds.Count == 0 && selectedTechnologyIds.Count == 0) return true; return GetProjectTechnologies(projectId).Any(item => selectedCategoryIds.Contains(item.CategoryId) || selectedTechnologyIds.Contains(item.TechnologyId)); }
@@ -191,25 +261,114 @@
     private static string GetTechnologyName(TechnologyApiDto item) => string.IsNullOrWhiteSpace(item.Name) ? "Technologie non renseignée" : item.Name;
     private static string GetStatusLabel(string status) => status switch { "draft" => "Brouillon", "published" => "Publié", "archived" => "Archivé", _ => status };
 
-    private void OpenProject(ProjectApiDto project) { selectedProject = Copy(project); modalErrors.Clear(); modalMessage = null; }
-    private void CloseProject() { if (!isSubmitting) selectedProject = null; }
+    private void OpenProject(ProjectApiDto project) { selectedProject = Copy(project); modalErrors.Clear(); modalMessage = null; relatedSection=null; ResetThumbnailUpload(); }
+    private void OpenCreateProject() { selectedProject = new(){Status="draft",Slug="",Title="",ShortDescription="",DisplayOrder=projects.Count}; modalErrors.Clear(); modalMessage=null; ResetThumbnailUpload(); }
+    private void CloseProject() { if (!isSubmitting && !isUploadingThumbnail) { selectedProject = null; ResetThumbnailUpload(); } }
     private void ShowRelatedMessage(string section) => modalMessage = $"La gestion des {section} sera connectée lors d’une prochaine étape.";
     private void ShowTechnologiesMessage() => ShowRelatedMessage("technologies");
     private void ShowMediaMessage() => ShowRelatedMessage("médias");
+    private void ToggleTechnologies() => relatedSection = relatedSection == "technologies" ? null : "technologies";
+    private void ToggleLearnings() => relatedSection = relatedSection == "learnings" ? null : "learnings";
     private void ShowLearningsMessage() => ShowRelatedMessage("apprentissages");
+
+    private async Task SelectCoverImageAsync(InputFileChangeEventArgs args)
+    {
+        if (selectedProject is null || isUploadingThumbnail) return;
+        var file = args.File;
+        if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp" or "image/gif"))
+        {
+            thumbnailUploadFailed = true;
+            thumbnailUploadMessage = "Sélectionnez une image JPG, PNG, WebP ou GIF.";
+            return;
+        }
+
+        thumbnailUploadFailed = false;
+        thumbnailUploadProgress = 0;
+        if (selectedProject.Id == 0)
+        {
+            pendingThumbnailFile = file;
+            thumbnailPreviewUrl = null;
+            thumbnailUploadMessage = $"{file.Name} sera envoyé lors de la création du projet.";
+            return;
+        }
+
+        try { await UploadThumbnailAsync(file, selectedProject.Id); }
+        catch { /* Le message détaillé est affiché dans le formulaire. */ }
+    }
+
+    private async Task UploadThumbnailAsync(IBrowserFile file, uint projectId)
+    {
+        isUploadingThumbnail = true;
+        thumbnailUploadFailed = false;
+        thumbnailUploadMessage = null;
+        try
+        {
+            var progress = new Progress<int>(value => { thumbnailUploadProgress = value; InvokeAsync(StateHasChanged); });
+            var media = await MediaApiService.UploadAsync(file, projectId, progress);
+            var publicUrl = ResolveMediaUrl(media.PublicUrl) ?? throw new InvalidOperationException("L’API n’a retourné aucune URL publique pour cette image.");
+            if (selectedProject is not null)
+            {
+                selectedProject.ThumbnailUrl = publicUrl;
+                thumbnailPreviewUrl = publicUrl;
+            }
+            pendingThumbnailFile = null;
+            thumbnailUploadProgress = 100;
+            thumbnailUploadMessage = "Image ajoutée à la médiathèque. Enregistrez le projet pour appliquer la couverture.";
+        }
+        catch (Exception exception)
+        {
+            thumbnailUploadFailed = true;
+            thumbnailUploadMessage = exception.Message;
+            throw;
+        }
+        finally { isUploadingThumbnail = false; }
+    }
+
+    private string? ResolveMediaUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute)) return absolute.ToString();
+        return Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root) ? new Uri(root, value).ToString() : null;
+    }
+
+    private void ResetThumbnailUpload()
+    {
+        pendingThumbnailFile = null;
+        thumbnailPreviewUrl = null;
+        thumbnailUploadMessage = null;
+        thumbnailUploadFailed = false;
+        thumbnailUploadProgress = 0;
+        isUploadingThumbnail = false;
+    }
 
     private async Task SaveProjectAsync()
     {
         if (selectedProject is null || isSubmitting) return; isSubmitting = true; modalErrors.Clear(); modalMessage = null;
         try
         {
-            var updated = await ProjectApiService.UpdateAsync(selectedProject.Id, selectedProject);
-            var index = projects.FindIndex(item => item.Id == updated.Id); if (index >= 0) projects[index] = updated;
+            var updated = selectedProject.Id == 0 ? await ProjectApiService.CreateAsync(selectedProject) : await ProjectApiService.UpdateAsync(selectedProject.Id, selectedProject);
+            UpsertProject(updated);
+            selectedProject = Copy(updated);
+            if (pendingThumbnailFile is not null)
+            {
+                await UploadThumbnailAsync(pendingThumbnailFile, updated.Id);
+                updated = await ProjectApiService.UpdateAsync(updated.Id, selectedProject);
+                UpsertProject(updated);
+            }
             selectedProject = null;
+            relatedSection = null;
+            ResetThumbnailUpload();
         }
         catch (ProjectApiException exception) { modalErrors.AddRange(exception.Errors); }
         catch (Exception) { modalErrors.Add("Impossible de modifier le projet. Vérifiez la connexion à l’API."); }
         finally { isSubmitting = false; }
+    }
+
+    private void UpsertProject(ProjectApiDto project)
+    {
+        var index = projects.FindIndex(item => item.Id == project.Id);
+        if (index >= 0) projects[index] = project;
+        else { projects.Add(project); technologiesByProject[project.Id] = []; }
     }
 
     private async Task DeleteProjectAsync()

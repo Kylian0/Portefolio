@@ -2,8 +2,5 @@ namespace FrontEnd.Models;
 
 public sealed class TechnologyCategoryApiDto
 {
-    public uint Id { get; init; }
-    public string? Name { get; init; }
-    public string? Slug { get; init; }
-    public int DisplayOrder { get; init; }
+    public uint Id { get; set; } public string? Name { get; set; } public string? Slug { get; set; } public int DisplayOrder { get; set; }
 }

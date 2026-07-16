@@ -18,7 +18,6 @@ builder.Services.AddScoped<IProjectTechnologyApiService, ProjectTechnologyApiSer
 builder.Services.AddScoped<IProjectLearningApiService, ProjectLearningApiService>();
 builder.Services.AddScoped<DocumentBlockHtmlConverter>();
 builder.Services.AddScoped<IAdminAccessService, IdentityAdminAccessService>();
-builder.Services.AddScoped<IAdminProjectService, DemoAdminProjectService>();
-builder.Services.AddScoped<IAdminMessageService, DemoAdminMessageService>();
+builder.Services.AddScoped<IAdminMessageService, AdminMessageApiService>();
 
 await builder.Build().RunAsync();

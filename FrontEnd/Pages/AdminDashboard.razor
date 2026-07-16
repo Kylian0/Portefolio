@@ -2,7 +2,7 @@
 @using FrontEnd.Models
 @using FrontEnd.Services
 @inject IAdminAccessService AdminAccess
-@inject IAdminProjectService ProjectService
+@inject IProjectApiService ProjectService
 @inject IAdminMessageService MessageService
 @inject NavigationManager Navigation
 
@@ -16,6 +16,7 @@
             <nav aria-label="Navigation de l'administration">
                 <a class="is-active" href="/admin">Vue d'ensemble</a>
                 <a href="/admin/projects">Projets</a>
+                <a href="/admin/technologies">Technologies</a>
                 <a href="/admin/media">Médiathèque</a>
                 <a href="/admin/messages">Messages</a>
                 <a href="/">Voir le portfolio</a>
@@ -36,13 +37,14 @@
                 <a href="/admin/projects"><span>Projets</span><strong>@projects.Count</strong><small>Gérer les réalisations →</small></a>
                 <a href="/admin/messages"><span>Messages reçus</span><strong>@messages.Count</strong><small>Consulter la messagerie →</small></a>
                 <a href="/admin/messages"><span>Messages non lus</span><strong>@UnreadCount</strong><small>@UnreadSummary</small></a>
-                <article><span>Visites ce mois-ci</span><strong>248</strong><small>Donnée de démonstration</small></article>
+                <a href="/admin/projects"><span>Projets publiés</span><strong>@projects.Count(x => x.Status == "published")</strong><small>Visibles publiquement</small></a>
             </section>
 
             <section class="admin-quick-actions" aria-labelledby="quick-actions-title">
                 <div><p class="admin-eyebrow">Raccourcis</p><h2 id="quick-actions-title">Accès rapides</h2></div>
                 <div class="admin-quick-actions__links">
                     <a href="/admin/projects"><strong>Gérer les projets</strong><span>Modifier les cartes et la documentation</span></a>
+                    <a href="/admin/technologies"><strong>Gérer les technologies</strong><span>Catégories, technologies et associations</span></a>
                     <a href="/admin/messages"><strong>Ouvrir les messages</strong><span>Consulter et traiter les prises de contact</span></a>
                     <a href="/" target="_blank"><strong>Voir le portfolio</strong><span>Ouvrir le site public dans un nouvel onglet</span></a>
                 </div>
@@ -75,34 +77,26 @@
                         @foreach (var project in LatestProjects)
                         {
                             <li>
-                                <img src="@project.ImageUrl" alt="" />
-                                <div><strong>@project.Name</strong><span>@project.Type · @string.Join(", ", project.Technologies.Take(2))</span></div>
-                                <a href="@($"/projects/{project.Slug}?admin=true")" aria-label="Ouvrir la documentation du projet @project.Name">→</a>
+                                <img src="@(project.ThumbnailUrl ?? "images/project-placeholder.svg")" alt="" />
+                                <div><strong>@project.Title</strong><span>@project.Status · modifié le @project.UpdatedAt.ToString("dd/MM/yyyy")</span></div>
+                                <a href="@($"/projects/{project.Slug}?admin=true")" aria-label="Ouvrir la documentation du projet @project.Title">→</a>
                             </li>
                         }
                     </ul>
                 </section>
             </div>
 
-            <section class="admin-panel admin-overview-activity">
-                <div class="admin-panel__heading"><div><h2>Activité récente</h2><p>Quelques événements utiles pour suivre le portfolio.</p></div><span>Démonstration</span></div>
-                <ol>
-                    <li><span class="admin-activity-dot"></span><div><strong>Nouveau message reçu</strong><p>Camille Bernard a envoyé « Opportunité de développeur junior ».</p></div><time>Il y a 2 h</time></li>
-                    <li><span class="admin-activity-dot"></span><div><strong>Documentation mise à jour</strong><p>Le contenu du projet Gestionnaire de tâches a été modifié.</p></div><time>Hier</time></li>
-                    <li><span class="admin-activity-dot"></span><div><strong>Projet ajouté</strong><p>Le projet Expérience 3D a été ajouté à la liste.</p></div><time>Il y a 5 jours</time></li>
-                </ol>
-            </section>
         </div>
     </main>
 }
 
 @code {
-    private IReadOnlyList<AdminProject> projects = [];
+    private IReadOnlyList<ProjectApiDto> projects = [];
     private IReadOnlyList<AdminMessage> messages = [];
     private int UnreadCount => messages.Count(message => !message.IsRead);
     private string UnreadSummary => UnreadCount == 0 ? "Tout est à jour" : "À consulter rapidement";
     private IEnumerable<AdminMessage> LatestMessages => messages.OrderByDescending(message => message.ReceivedAt).Take(3);
-    private IEnumerable<AdminProject> LatestProjects => projects.Take(3);
+    private IEnumerable<ProjectApiDto> LatestProjects => projects.OrderByDescending(x => x.UpdatedAt).Take(3);
 
     protected override async Task OnInitializedAsync()
     {

@@ -14,7 +14,7 @@
 }
 
 .project-document__header {
-    padding-bottom: 2.5rem;
+    padding-bottom: 2rem;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -32,7 +32,8 @@
     font-weight: 700;
 }
 
-.project-document__admin-bar button {
+.project-document__admin-bar button,
+.project-document__admin-bar a {
     padding: 0.5rem 0.8rem;
     border: 0;
     border-radius: 0.4rem;
@@ -41,6 +42,7 @@
     cursor: pointer;
     font: inherit;
     font-weight: 700;
+    text-decoration: none;
 }
 
 .project-document__admin-message { margin: -1rem 0 2rem; color: var(--color-muted); font-size: 0.9rem; }
@@ -103,13 +105,6 @@
     line-height: 1.5;
 }
 
-.project-document__technology-section { margin-top: 2rem; }
-.project-document__technology-section h2 { margin: 0 0 0.75rem; font-family: inherit; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.project-document ul.project-document__technologies { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
-.project-document__technologies li { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; padding: 0.4rem 0.65rem; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-background); font-size: 0.82rem; line-height: 1.2; }
-.project-document__technologies small { color: var(--color-muted); font-size: 0.72rem; }
-.project-document__technologies .project-document__technology--primary { border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border)); background: var(--color-primary-soft); color: var(--color-primary); }
-.project-document__technology-error { margin: 1.5rem 0 0; color: var(--color-muted); font-size: 0.9rem; }
 .project-learnings ul { display: grid; gap: 0.85rem; margin-top: 1.5rem; padding: 0; list-style: none; }
 .project-learnings li { position: relative; margin: 0; padding: 1rem 1rem 1rem 2.7rem; border: 1px solid var(--color-border); border-radius: 0.55rem; background: var(--color-background); }
 .project-learnings li::before { position: absolute; top: 1rem; left: 1rem; color: var(--color-primary); content: "✓"; font-weight: 800; }
@@ -143,13 +138,57 @@
 .documentation-block-form__wide { grid-column: 1 / -1; }
 .documentation-block-modal > footer { justify-content: flex-end; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
 .documentation-block-modal > footer button { padding: 0.65rem 0.85rem; border: 1px solid var(--color-border); border-radius: 0.45rem; cursor: pointer; font: inherit; font-weight: 700; }
-.wysiwyg-editor { margin-top: 2rem; }
+.project-document__header + .wysiwyg-editor { margin-top: 0.35rem; }
+.wysiwyg-editor { margin-top: 0; padding-top: 0; }
+.wysiwyg-editor__hidden-upload { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); opacity: 0; pointer-events: none; }
 .wysiwyg-editor__header, .wysiwyg-editor__footer, .wysiwyg-media-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
-.wysiwyg-editor__header { margin-bottom: 1rem; }
+.wysiwyg-editor__commandbar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 1000;
+    margin: 0;
+    overflow: hidden;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+    box-shadow: 0 8px 28px var(--shadow-strong);
+    backdrop-filter: blur(12px);
+}
+.wysiwyg-editor__header {
+    position: static;
+    margin: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: .75rem clamp(1rem, 3vw, 2rem);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+}
 .wysiwyg-editor__header h2 { margin: 0.2rem 0; font-family: inherit; font-size: 1.4rem; }
 .wysiwyg-editor__header > div:last-child { display: flex; gap: 0.5rem; }
 .wysiwyg-editor__header span { color: var(--color-success-text); font-size: 0.8rem; }
 .wysiwyg-editor__header span.is-dirty { color: var(--color-primary); }
+.wysiwyg-media-actions { display: flex; align-items: center; gap: .5rem; max-width: 1400px; margin: 0 auto; padding: .6rem clamp(1rem, 3vw, 2rem); overflow-x: auto; border-top: 1px solid var(--color-border); background: var(--color-background); }
+.wysiwyg-media-actions strong { margin-right: .2rem; color: var(--color-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.wysiwyg-media-actions__insert,
+.wysiwyg-media-actions__save { display: flex; align-items: center; gap: .4rem; }
+.wysiwyg-media-actions__insert button {
+    flex: 0 0 auto;
+    min-height: 1.9rem;
+    padding: .3rem .52rem;
+    border-radius: .38rem;
+    font-size: .72rem;
+    font-weight: 650;
+}
+.wysiwyg-media-actions__insert button:hover,
+.wysiwyg-media-actions__insert button:focus-visible { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+.wysiwyg-media-actions__save button { flex: 0 0 auto; min-height: 2.1rem; padding: .4rem .65rem; font-size: .76rem; }
+.wysiwyg-editor__commandbar-spacer { flex: 1 1 auto; min-width: 1rem; }
 .wysiwyg-editor button { padding: 0.65rem 0.85rem; border: 1px solid var(--color-border); border-radius: 0.45rem; background: var(--color-surface); color: var(--color-text); cursor: pointer; font: inherit; font-weight: 700; }
 .wysiwyg-editor button:disabled { cursor: not-allowed; opacity: 0.55; }
 .wysiwyg-editor__title { display: grid; gap: 0.4rem; margin-bottom: 1rem; color: var(--color-text); font-size: 0.82rem; font-weight: 700; }
@@ -159,9 +198,32 @@
 .wysiwyg-gallery-picker { margin-bottom: 1rem; padding: 0.8rem; border: 1px solid var(--color-border); border-radius: 0.55rem; background: var(--color-background); }
 .wysiwyg-gallery-picker > div { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; margin: 0.7rem 0; }
 .wysiwyg-gallery-picker label { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--color-muted); font-size: 0.8rem; }
-.wysiwyg-editor__page { overflow: hidden; border: 1px solid var(--color-border); border-radius: 0.6rem; background: #fff; box-shadow: 0 18px 48px var(--shadow-soft); }
-.wysiwyg-editor__footer { margin-top: 1rem; }
+.wysiwyg-editor__page { overflow: visible; border: 1px solid var(--color-border); border-radius: 0.6rem; background: #fff; box-shadow: 0 18px 48px var(--shadow-soft); }
+.wysiwyg-editor__page .tox-tinymce { overflow: visible; }
+.wysiwyg-editor__page .tox-editor-header {
+    position: fixed !important;
+    top: 58px !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 999 !important;
+    width: 100vw !important;
+    padding: .25rem clamp(1rem, 3vw, 2rem) !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    background: var(--color-surface) !important;
+    box-shadow: 0 8px 22px var(--shadow-soft) !important;
+}
+.wysiwyg-editor__page .tox-toolbar-overlord,
+.wysiwyg-editor__page .tox-toolbar__primary { max-width: 1400px; margin: 0 auto; }
+.wysiwyg-editor__footer { margin-top: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .65rem; background: var(--color-background); }
 .wysiwyg-editor__footer small { max-width: 55ch; color: var(--color-muted); line-height: 1.5; }
+
+@media (max-width: 700px) {
+    .wysiwyg-editor { padding-top: 0; }
+    .wysiwyg-editor__header { align-items: flex-start; padding: .7rem .8rem; }
+    .wysiwyg-editor__header h2 { font-size: 1.05rem; }
+    .wysiwyg-editor__header .admin-eyebrow { display: none; }
+    .wysiwyg-media-actions { padding: .55rem .8rem; }
+}
 
 .project-document section {
     margin-top: clamp(3.5rem, 8vw, 5.5rem);
@@ -255,6 +317,7 @@
 .project-document__state p { margin: 0.5rem 0 1rem; color: var(--color-muted); }
 .project-document__state button { border: 0; background: transparent; color: var(--color-primary); cursor: pointer; font: inherit; font-weight: 700; }
 .document-block { margin-top: clamp(3rem, 7vw, 5rem); }
+.project-document__header + .document-block { margin-top: 0.35rem; }
 .document-block .document-media { margin-top: 0; }
 .document-rich-text > :first-child { margin-top: 0; }
 .document-rich-text > :last-child { margin-bottom: 0; }

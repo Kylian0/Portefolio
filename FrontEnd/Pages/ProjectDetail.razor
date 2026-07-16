@@ -12,8 +12,8 @@
             @if (AdminMode && AdminAccess.IsAuthenticated)
             {
                 <div class="project-document__admin-bar">
-                    <span>Mode administration</span>
-                    <button type="button" @onclick="ToggleEditMode">@(editMode ? "Fermer l’éditeur" : "Modifier")</button>
+                    <span>Mode administration — modification active</span>
+                    <a href="/admin/projects">Retour à la gestion des projets</a>
                 </div>
             }
 
@@ -27,32 +27,6 @@
                     <div><dt>Statut</dt><dd>@GetStatusLabel(project.Status)</dd></div>
                     <div><dt>Année</dt><dd>@GetProjectYear(project)</dd></div>
                 </dl>
-                @if (data.Technologies.Count > 0)
-                {
-                    <div class="project-document__technology-section">
-                        <h2>Technologies</h2>
-                        <ul class="project-document__technologies" aria-label="Technologies du projet">
-                            @foreach (var technology in data.Technologies)
-                            {
-                                <li class="@(technology.IsPrimary ? "project-document__technology--primary" : null)">
-                                    @if (technology.IsPrimary)
-                                    {
-                                        <span aria-hidden="true">★</span>
-                                    }
-                                    <strong>@GetTechnologyName(technology)</strong>
-                                    @if (!string.IsNullOrWhiteSpace(technology.CategoryName))
-                                    {
-                                        <small>@technology.CategoryName</small>
-                                    }
-                                </li>
-                            }
-                        </ul>
-                    </div>
-                }
-                else if (data.TechnologyLoadFailed)
-                {
-                    <p class="project-document__technology-error" role="status">Les technologies sont temporairement indisponibles.</p>
-                }
             }
             else
             {
@@ -83,7 +57,7 @@
                 <p>Ce projet n’existe pas ou n’est plus disponible.</p>
             </section>
         }
-        else if (AdminMode && AdminAccess.IsAuthenticated && editMode)
+        else if (AdminMode && AdminAccess.IsAuthenticated)
         {
             <ProjectDocumentationEditor Data="data" OnChanged="LoadDocumentationAsync" />
         }
@@ -139,7 +113,6 @@
 
     private ProjectDocumentationData? data;
     private bool isLoading = true;
-    private bool editMode;
     private string? errorMessage;
 
     private string ProjectTitle => data?.Project?.Title ?? "Présentation du projet";
@@ -174,8 +147,6 @@
         }
     }
 
-    private void ToggleEditMode() => editMode = !editMode;
-
     private static string GetStatusLabel(string status) => status switch
     {
         "published" => "Publié",
@@ -187,6 +158,4 @@
     private static int GetProjectYear(ProjectApiDto project) =>
         project.StartedAt?.Year ?? project.PublishedAt?.Year ?? project.CreatedAt.Year;
 
-    private static string GetTechnologyName(ProjectTechnologyApiDto technology) =>
-        string.IsNullOrWhiteSpace(technology.TechnologyName) ? "Technologie non renseignée" : technology.TechnologyName;
 }

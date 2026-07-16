@@ -62,6 +62,7 @@ builder.Services.AddScoped<TechnologyCategory>();
 builder.Services.AddScoped<Technology>();
 builder.Services.AddScoped<ProjectTechnology>();
 builder.Services.AddScoped<ProjectLearning>();
+builder.Services.AddScoped<ContactMessage>();
 builder.Services.AddSingleton<HtmlDocumentBlockConverter>();
 builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection(MediaStorageOptions.SectionName));
 builder.Services.AddScoped<MediaFileStorageService>();
@@ -69,6 +70,7 @@ builder.Services.AddScoped<MediaReferenceService>();
 
 var app = builder.Build();
 await app.Services.GetRequiredService<AdminIdentityInitializer>().InitializeAsync();
+await using (var scope = app.Services.CreateAsyncScope()) await scope.ServiceProvider.GetRequiredService<ContactMessage>().EnsureTableAsync();
 var mediaOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaStorageOptions>>().Value;
 var mediaRoot = Path.GetFullPath(Path.IsPathRooted(mediaOptions.RootPath) ? mediaOptions.RootPath : Path.Combine(app.Environment.ContentRootPath, mediaOptions.RootPath));
 Directory.CreateDirectory(mediaRoot);

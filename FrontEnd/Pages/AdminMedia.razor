@@ -11,7 +11,7 @@
 @if (AdminAccess.IsAuthenticated)
 {
 <main class="admin-dashboard">
-    <aside class="admin-sidebar"><a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a><nav aria-label="Navigation de l'administration"><a href="/admin">Vue d'ensemble</a><a href="/admin/projects">Projets</a><a class="is-active" href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a></nav></aside>
+    <aside class="admin-sidebar"><a class="admin-sidebar__brand" href="/admin">Kylian <span>Admin</span></a><nav aria-label="Navigation de l'administration"><a href="/admin">Vue d'ensemble</a><a href="/admin/projects">Projets</a><a href="/admin/technologies">Technologies</a><a class="is-active" href="/admin/media">Médiathèque</a><a href="/admin/messages">Messages</a><a href="/">Voir le portfolio</a></nav></aside>
     <div class="admin-main media-library">
         <header class="admin-header"><div><p class="admin-eyebrow">Administration</p><h1>Médiathèque</h1><p>Centralisez les images, vidéos et documents du portfolio.</p></div><span>@FilteredMedia.Count média(s)</span></header>
 
@@ -32,7 +32,7 @@
         else if (!string.IsNullOrWhiteSpace(error)) { <div class="admin-project-empty admin-project-error" role="alert"><p>@error</p><button @onclick="LoadAsync">Réessayer</button></div> }
         else if (media.Count == 0) { <div class="admin-project-empty">Aucun média enregistré.</div> }
         else if (FilteredMedia.Count == 0) { <div class="admin-project-empty">Aucun média ne correspond aux filtres.</div> }
-        else { <section class="media-grid">@foreach (var item in FilteredMedia) { <article class="media-card"> <button class="media-card__preview" type="button" @onclick="() => Open(item)">@if (item.MediaType == "image" && ResolveUrl(item.PublicUrl) is { } image) { <img src="@image" alt="@(item.AltText ?? item.OriginalFilename)" loading="lazy" /> } else { <span>@TypeLabel(item.MediaType)</span> }</button><div><span class="media-type">@TypeLabel(item.MediaType)</span><h2 title="@item.OriginalFilename">@item.OriginalFilename</h2><p>@ProjectName(item.ProjectId) · @FormatSize(item.FileSize)</p><button type="button" @onclick="() => Open(item)">Gérer</button></div></article> }</section> }
+        else { <section class="media-grid">@foreach (var item in FilteredMedia) { <article class="media-card"> <button class="media-card__preview" type="button" @onclick="() => Open(item)">@if (IsImage(item) && ResolveMediaUrl(item) is { } image) { <img src="@image" alt="@(item.AltText ?? item.OriginalFilename)" loading="lazy" /> } else { <span>@TypeLabel(item.MediaType)</span> }</button><div><span class="media-type">@TypeLabel(item.MediaType)</span><h2 title="@item.OriginalFilename">@item.OriginalFilename</h2><p>@ProjectName(item.ProjectId) · @FormatSize(item.FileSize)</p><button type="button" @onclick="() => Open(item)">Gérer</button></div></article> }</section> }
     </div>
 </main>
 }
@@ -41,10 +41,10 @@
 {
 <div class="admin-modal-backdrop" @onclick="Close"><section class="admin-project-modal media-edit-modal" role="dialog" aria-modal="true" aria-labelledby="media-edit-title" @onclick:stopPropagation="true">
     <header><div><p class="admin-eyebrow">Média</p><h2 id="media-edit-title">@editing.OriginalFilename</h2></div><button type="button" aria-label="Fermer" @onclick="Close">×</button></header>
-    @if (editing.MediaType == "image" && ResolveUrl(editing.PublicUrl) is { } preview) { <img class="media-edit-preview" src="@preview" alt="@(editing.AltText ?? editing.OriginalFilename)" /> }
+    @if (IsImage(editing) && ResolveMediaUrl(editing) is { } preview) { <img class="media-edit-preview" src="@preview" alt="@(editing.AltText ?? editing.OriginalFilename)" /> }
     <div class="admin-project-form"><label>Texte alternatif<input maxlength="500" @bind="editing.AltText" /></label><label>Légende<textarea maxlength="500" @bind="editing.Caption"></textarea></label><label>Projet associé<select @bind="editing.ProjectId"><option value="">Aucun projet</option>@foreach (var project in projects.OrderBy(x => x.Title)) { <option value="@project.Id">@project.Title</option> }</select></label></div>
     @if (!string.IsNullOrWhiteSpace(modalError)) { <p class="admin-modal-message is-error" role="alert">@modalError</p> }
-    <footer><button type="button" disabled="@saving" @onclick="CopyUrlAsync">Copier l’URL</button>@if (ResolveUrl(editing.PublicUrl) is { } download) { <a class="admin-secondary-button" href="@download" target="_blank" download="@editing.OriginalFilename">Télécharger</a> }<button class="documentation-editor__danger" disabled="@saving" @onclick="DeleteAsync">Supprimer</button><button class="admin-primary-button" disabled="@saving" @onclick="SaveAsync">@(saving ? "Enregistrement…" : "Enregistrer")</button></footer>
+    <footer><button type="button" disabled="@saving" @onclick="CopyUrlAsync">Copier l’URL</button>@if (ResolveMediaUrl(editing) is { } download) { <a class="admin-secondary-button" href="@download" target="_blank" download="@editing.OriginalFilename">Télécharger</a> }<button class="documentation-editor__danger" disabled="@saving" @onclick="DeleteAsync">Supprimer</button><button class="admin-primary-button" disabled="@saving" @onclick="SaveAsync">@(saving ? "Enregistrement…" : "Enregistrer")</button></footer>
 </section></div>
 }
 
@@ -61,8 +61,10 @@
     private void Close() { if (!saving) editing = null; }
     private async Task SaveAsync() { if (editing is null || saving) return; saving = true; modalError = ""; try { var updated = await MediaService.UpdateAsync(editing.Id, editing); var index = media.FindIndex(x => x.Id == updated.Id); if (index >= 0) media[index] = updated; editing = null; } catch (Exception ex) { modalError = ex.Message; } finally { saving = false; } }
     private async Task DeleteAsync() { if (editing is null || saving || !await JS.InvokeAsync<bool>("confirm", "Supprimer définitivement ce média ? La suppression sera refusée s’il est utilisé dans une documentation.")) return; saving = true; modalError = ""; try { await MediaService.DeleteAsync(editing.Id); media.RemoveAll(x => x.Id == editing.Id); editing = null; } catch (Exception ex) { modalError = ex.Message; } finally { saving = false; } }
-    private async Task CopyUrlAsync() { var url = ResolveUrl(editing?.PublicUrl); if (url is not null) await JS.InvokeVoidAsync("navigator.clipboard.writeText", url); }
-    private string? ResolveUrl(string? value) { if (string.IsNullOrWhiteSpace(value)) return null; if (Uri.TryCreate(value, UriKind.Absolute, out var absolute)) return absolute.ToString(); return Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root) ? new Uri(root, value).ToString() : null; }
+    private async Task CopyUrlAsync() { var url = editing is null ? null : ResolveMediaUrl(editing); if (url is not null) await JS.InvokeVoidAsync("navigator.clipboard.writeText", url); }
+    private static bool IsImage(MediaApiDto item) => string.Equals(item.MediaType?.Trim(), "image", StringComparison.OrdinalIgnoreCase) || item.MimeType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
+    private string? ResolveMediaUrl(MediaApiDto item) => ResolveUrl(item.PublicUrl) ?? ResolveUrl(item.FilePath);
+    private string? ResolveUrl(string? value) { if (string.IsNullOrWhiteSpace(value)) return null; value = value.Trim().Replace('\\', '/'); if (Uri.TryCreate(value, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https") return absolute.ToString(); if (!Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root)) return null; var publicPath = value.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase) || value.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) ? "/" + value.TrimStart('/') : null; return publicPath is null ? null : new Uri(root, publicPath).ToString(); }
     private string ProjectName(uint? id) => id is null ? "Sans projet" : projects.FirstOrDefault(x => x.Id == id)?.Title ?? "Projet inconnu";
     private static string TypeLabel(string value) => value switch { "image" => "Image", "video" => "Vidéo", _ => "Document" };
     private static string FormatSize(ulong bytes) => bytes >= 1_048_576 ? $"{bytes / 1_048_576d:0.#} Mo" : $"{bytes / 1024d:0.#} Ko";

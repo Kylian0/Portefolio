@@ -1,24 +1,29 @@
 @using TinyMCE.Blazor
+@implements IDisposable
 @inject IProjectDocumentationService DocumentationService
+@inject IMediaApiService MediaApiService
+@inject IProjectApiService ProjectApiService
 @inject DocumentBlockHtmlConverter Converter
 @inject IJSRuntime JSRuntime
 @inject IConfiguration Configuration
 
 <section class="wysiwyg-editor" aria-label="Éditeur visuel de documentation">
+    <InputFile id="documentation-image-upload" class="wysiwyg-editor__hidden-upload" OnChange="UploadImageAsync" accept="image/jpeg,image/png,image/webp,image/gif" />
+    <InputFile id="documentation-video-upload" class="wysiwyg-editor__hidden-upload" OnChange="UploadVideoAsync" accept="video/mp4,video/webm" />
     @if (Data.Document is null)
     {
         <div class="documentation-editor__empty"><h2>Aucune documentation</h2><p>Créez un document pour commencer la rédaction.</p><button type="button" disabled="@isSaving" @onclick="CreateDocumentAsync">Créer la documentation</button></div>
     }
     else
     {
-        <header class="wysiwyg-editor__header">
-            <div><p class="admin-eyebrow">Éditeur visuel</p><h2>@title</h2><span class="@(isDirty ? "is-dirty" : null)">@(isDirty ? "Modifications non enregistrées" : "Document enregistré")</span></div>
-            <div><button type="button" disabled="@(!isDirty || isSaving)" @onclick="CancelAsync">Annuler</button><button type="button" class="admin-primary-button" disabled="@(!isDirty || isSaving)" @onclick="SaveAsync">@(isSaving ? "Enregistrement…" : "Enregistrer")</button></div>
-        </header>
+        <div class="wysiwyg-editor__commandbar">
+            <div class="wysiwyg-media-actions">
+                <span class="wysiwyg-editor__commandbar-spacer"></span>
+                <div class="wysiwyg-media-actions__save"><button type="button" disabled="@(!isDirty || isSaving)" @onclick="CancelAsync">Annuler</button><button type="button" class="admin-primary-button" disabled="@isSaving" @onclick="SaveAsync">@(isSaving ? "Enregistrement…" : "Enregistrer")</button></div>
+            </div>
+        </div>
 
         <label class="wysiwyg-editor__title"><span>Titre du document</span><input maxlength="200" value="@title" @oninput="OnTitleChanged" /></label>
-
-        <div class="wysiwyg-media-actions"><strong>Insérer depuis la médiathèque</strong><button type="button" @onclick="OpenImagePicker">Image</button><button type="button" @onclick="OpenGalleryPicker">Galerie</button><button type="button" @onclick="OpenVideoPicker">Vidéo</button><button type="button" @onclick="OpenDocumentPicker">Document</button></div>
 
         <div class="wysiwyg-editor__page">
             <Editor Id="portfolio-document-editor"
@@ -32,13 +37,14 @@
         <footer class="wysiwyg-editor__footer">
             <button type="button" class="documentation-editor__danger" disabled="@isSaving" @onclick="DeleteDocumentAsync">Supprimer la documentation</button>
             <small>L’aperçu TinyMCE utilise les mêmes styles de contenu ; le HTML sera nettoyé côté serveur avant publication.</small>
+            <button type="button" class="admin-primary-button" disabled="@isSaving" @onclick="SaveAsync">@(isSaving ? "Enregistrement…" : "Enregistrer les modifications")</button>
         </footer>
     }
 
     @if (errors.Count > 0) { <div class="documentation-editor__errors" role="alert">@foreach (var error in errors) { <p>@error</p> }</div> }
     @if (!string.IsNullOrWhiteSpace(successMessage)) { <p class="admin-modal-message" role="status">@successMessage</p> }
 </section>
-<MediaLibraryPicker Open="@pickerOpen" Media="Data.Media" MediaType="@pickerType" Multiple="@pickerMultiple" OnSelected="InsertMediaAsync" OnCancelled="ClosePicker" />
+<MediaLibraryPicker Open="@pickerOpen" Media="pickerMedia" Projects="pickerProjects" MediaType="@pickerType" Multiple="@pickerMultiple" OnSelected="InsertMediaAsync" OnCancelled="ClosePicker" />
 
 @code {
     [Parameter, EditorRequired] public ProjectDocumentationData Data { get; set; } = default!;
@@ -52,6 +58,8 @@
     private string? successMessage;
     private bool pickerOpen, pickerMultiple;
     private string pickerType = "image";
+    private IReadOnlyList<MediaApiDto> pickerMedia = [];
+    private IReadOnlyList<ProjectApiDto> pickerProjects = [];
     private bool isDirty;
     private bool isSaving;
     private bool initialized;
@@ -60,10 +68,12 @@
     private Dictionary<string, object> EditorConfiguration => new()
     {
         ["height"] = 720,
-        ["menubar"] = "file edit view insert format tools table help",
-        ["plugins"] = "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount codesample",
-        ["toolbar"] = "undo redo | blocks fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | outdent indent | bullist numlist | link table blockquote codesample hr | removeformat code preview fullscreen",
+        ["menubar"] = false,
+        ["plugins"] = "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount codesample portfoliomedia",
+        ["external_plugins"] = new Dictionary<string, string> { ["portfoliomedia"] = "/js/portfolio-media-plugin.js" },
+        ["toolbar"] = "undo redo | blocks fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | outdent indent | bullist numlist | portfolioimage portfoliogallery portfoliovideo | link table blockquote codesample hr | removeformat code preview fullscreen",
         ["toolbar_mode"] = "sliding",
+        ["toolbar_sticky"] = false,
         ["skin"] = "oxide",
         ["content_css"] = "default",
         ["promotion"] = false,
@@ -86,6 +96,8 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || Data.Document is null) return;
+        mediaPickerReference = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("documentationEditor.registerMediaPicker", mediaPickerReference);
         var draft = await JSRuntime.InvokeAsync<string?>("documentationEditor.loadDraft", DraftKey);
         if (!string.IsNullOrWhiteSpace(draft) && draft != originalHtml) { html = draft; await MarkDirtyAsync(); StateHasChanged(); }
     }
@@ -100,10 +112,56 @@
     private async Task DeleteDocumentAsync() { if (!await JSRuntime.InvokeAsync<bool>("confirm", "Supprimer cette documentation et tous ses blocs ?")) return; await RunAsync(async () => { await DocumentationService.DeleteDocumentAsync(Data.Document!.Id); await JSRuntime.InvokeVoidAsync("documentationEditor.clearDraft", DraftKey); await JSRuntime.InvokeVoidAsync("documentationEditor.disableLeaveWarning"); await OnChanged.InvokeAsync(); }); }
 
     private void OpenPicker(string type, bool multiple) { pickerType = type; pickerMultiple = multiple; pickerOpen = true; }
-    private void OpenImagePicker() => OpenPicker("image", false);
     private void OpenGalleryPicker() => OpenPicker("image", true);
-    private void OpenVideoPicker() => OpenPicker("video", false);
-    private void OpenDocumentPicker() => OpenPicker("document", false);
+    [JSInvokable]
+    public async Task OpenMediaPickerFromTinyMce(string type, bool multiple)
+    {
+        if (multiple)
+        {
+            try
+            {
+                var mediaTask = MediaApiService.GetAllAsync();
+                var projectsTask = ProjectApiService.GetAllAsync();
+                await Task.WhenAll(mediaTask, projectsTask);
+                pickerMedia = await mediaTask;
+                pickerProjects = await projectsTask;
+            }
+            catch
+            {
+                pickerMedia = Data.Media;
+                pickerProjects = Data.Project is null ? [] : [Data.Project];
+            }
+        }
+        else
+        {
+            pickerMedia = Data.Media;
+            pickerProjects = Data.Project is null ? [] : [Data.Project];
+        }
+        OpenPicker(type, multiple);
+        await InvokeAsync(StateHasChanged);
+    }
+    private async Task UploadImageAsync(InputFileChangeEventArgs args) => await UploadAndInsertAsync(args.File, "image");
+    private async Task UploadVideoAsync(InputFileChangeEventArgs args) => await UploadAndInsertAsync(args.File, "video");
+    private async Task UploadAndInsertAsync(IBrowserFile file, string expectedType)
+    {
+        if (isSaving || Data.Project is null) return;
+        var valid = expectedType == "image"
+            ? file.ContentType is "image/jpeg" or "image/png" or "image/webp" or "image/gif"
+            : file.ContentType is "video/mp4" or "video/webm";
+        if (!valid) { errors.Clear(); errors.Add(expectedType == "image" ? "Sélectionnez une image JPG, PNG, WebP ou GIF." : "Sélectionnez une vidéo MP4 ou WebM."); return; }
+
+        isSaving = true;
+        errors.Clear();
+        successMessage = null;
+        try
+        {
+            var media = await MediaApiService.UploadAsync(file, Data.Project.Id);
+            await InsertMediaAsync([media]);
+            successMessage = expectedType == "image" ? "Image envoyée et insérée dans la documentation." : "Vidéo envoyée et insérée dans la documentation.";
+        }
+        catch (Exception exception) { errors.Add(exception.Message); }
+        finally { isSaving = false; }
+    }
     private void ClosePicker() => pickerOpen = false;
     private async Task InsertMediaAsync(IReadOnlyList<MediaApiDto> selected)
     {
@@ -132,4 +190,7 @@
         catch { errors.Add("L’opération n’a pas pu être effectuée. Les modifications locales sont conservées."); }
         finally { isSaving = false; }
     }
+
+    private DotNetObjectReference<ProjectDocumentationEditor>? mediaPickerReference;
+    public void Dispose() => mediaPickerReference?.Dispose();
 }
