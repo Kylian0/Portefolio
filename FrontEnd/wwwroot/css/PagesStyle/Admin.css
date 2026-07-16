@@ -432,6 +432,274 @@
     .media-picker-modal__footer > div { display: grid; grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 360px) { .media-picker-grid { grid-template-columns: 1fr; } }
+
+/* Responsive unifié de l'espace administrateur. */
+@media (max-width: 800px) {
+    .admin-dashboard {
+        display: block;
+        min-height: 100dvh;
+        overflow: clip;
+    }
+
+    .admin-sidebar {
+        position: relative;
+        z-index: 20;
+        padding: .75rem 0;
+        overflow: hidden;
+        border-right: 0;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-surface);
+        box-shadow: 0 5px 18px var(--shadow-soft);
+    }
+
+    .admin-sidebar__brand {
+        margin: 0;
+        padding: .15rem 1rem .7rem;
+        font-size: 1rem;
+    }
+
+    .admin-sidebar nav {
+        display: flex;
+        gap: .4rem;
+        padding: 0 1rem .2rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+    }
+
+    .admin-sidebar nav::-webkit-scrollbar { display: none; }
+    .admin-sidebar nav a {
+        min-height: 2.45rem;
+        flex: 0 0 auto;
+        padding: .62rem .8rem;
+        border: 1px solid var(--color-border);
+        border-radius: .55rem;
+        background: var(--color-background);
+        font-size: .82rem;
+        line-height: 1.15;
+        scroll-snap-align: start;
+        white-space: nowrap;
+    }
+
+    .admin-sidebar nav .is-active {
+        border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+        background: var(--color-primary-soft);
+    }
+
+    .admin-main {
+        width: 100%;
+        min-width: 0;
+        padding: 1.1rem;
+    }
+
+    .admin-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .8rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .admin-header > div { min-width: 0; }
+    .admin-header h1 { font-size: clamp(1.65rem, 8vw, 2.15rem); line-height: 1.15; overflow-wrap: anywhere; }
+    .admin-header p:last-child { margin: .4rem 0 0; color: var(--color-muted); font-size: .88rem; line-height: 1.5; }
+    .admin-header > button { width: 100%; min-height: 2.75rem; }
+    .admin-header > span { align-self: flex-start; }
+
+    .admin-stats,
+    .admin-overview__stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .7rem;
+        margin: 1rem 0;
+    }
+
+    .admin-stats article,
+    .admin-overview__stats a { min-width: 0; padding: .9rem; }
+    .admin-stats strong,
+    .admin-overview__stats a strong { font-size: 1.55rem; }
+    .admin-overview__stats a small { font-size: .7rem; line-height: 1.3; }
+
+    .admin-panel { padding: 1rem; border-radius: .7rem; }
+    .admin-panel__heading { align-items: flex-start; gap: .65rem; margin-bottom: .9rem; }
+    .admin-panel__heading p { font-size: .82rem; }
+
+    .admin-quick-actions {
+        grid-template-columns: 1fr;
+        gap: .8rem;
+        padding: 1rem;
+    }
+
+    .admin-quick-actions__links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-quick-actions__links a { min-height: 4rem; padding: .7rem; }
+    .admin-quick-actions__links span { white-space: normal; }
+
+    .admin-overview__columns { grid-template-columns: 1fr; gap: .8rem; }
+    .admin-overview-messages li { grid-template-columns: 2.25rem minmax(0, 1fr); }
+    .admin-overview-messages time { grid-column: 2; }
+    .admin-overview-projects li { grid-template-columns: 3.2rem minmax(0, 1fr) 2rem; }
+
+    .admin-project-tools { gap: .65rem; margin: 1rem 0; }
+    .admin-project-tools > * { width: 100%; }
+    .admin-project-search input,
+    .admin-filter-toggle { min-height: 2.8rem; font-size: 1rem; }
+    .admin-filters { grid-template-columns: 1fr; gap: 1rem; padding: 1rem; }
+    .admin-status-filters { gap: .75rem; }
+    .admin-project-grid { grid-template-columns: 1fr; }
+
+    .admin-message-filters,
+    .media-library-tools { grid-template-columns: 1fr 1fr; gap: .7rem; padding: 1rem; }
+    .admin-message-filters input,
+    .admin-message-filters select,
+    .media-library-tools input,
+    .media-library-tools select { min-width: 0; min-height: 2.8rem; font-size: 1rem; }
+
+    .media-upload-zone { margin-bottom: 1rem; padding: 1.7rem 1rem; }
+    .media-upload-zone strong { font-size: .95rem; }
+    .media-upload-zone span,
+    .media-upload-zone small { font-size: .78rem; }
+    .media-upload-list article { grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: .75rem; }
+    .media-upload-list progress { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+    .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .media-card { min-width: 0; }
+    .media-card > div { padding: .75rem; }
+
+    .admin-technology-accordions { padding: .65rem; }
+    .admin-category-management > summary,
+    .admin-technology-category > summary { padding: .8rem; }
+    .admin-technology-category__body { padding: 0 .7rem .7rem; }
+    .admin-category-list { padding: 0 .7rem .7rem; }
+    .admin-category-list article { gap: .75rem; }
+
+    .admin-related-editor { padding: .8rem; }
+    .admin-related-add { grid-template-columns: 1fr; }
+    .admin-relation-list article { align-items: stretch; flex-direction: column; }
+    .admin-relation-list article > * { width: 100%; }
+
+    .admin-modal-backdrop {
+        padding: 0;
+        place-items: stretch;
+        overflow: hidden;
+    }
+
+    .admin-project-modal,
+    .admin-message-modal,
+    .media-edit-modal {
+        display: flex;
+        width: 100%;
+        height: 100dvh;
+        min-height: 0;
+        max-height: 100dvh;
+        flex-direction: column;
+        overflow-y: auto;
+        border: 0;
+        border-radius: 0;
+        overscroll-behavior: contain;
+    }
+
+    .admin-project-modal > header,
+    .admin-project-modal__header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 1rem;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-surface);
+    }
+
+    .admin-project-modal > header > button,
+    .admin-project-modal__close { flex: 0 0 auto; }
+    .admin-project-modal__body { flex: 1 0 auto; padding: 1rem; }
+    .admin-project-form { display: grid; grid-template-columns: 1fr; gap: 1rem; padding: 1rem; }
+    .admin-project-modal__body .admin-project-form { padding: 0; }
+    .admin-project-form label,
+    .admin-project-form .form-field { min-width: 0; grid-column: 1 !important; }
+    .admin-project-form input,
+    .admin-project-form textarea,
+    .admin-project-form select { max-width: 100%; font-size: 1rem; }
+
+    .admin-project-modal > footer,
+    .admin-project-modal__footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        flex: 0 0 auto;
+        gap: .65rem;
+        margin: auto 0 0 !important;
+        padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom)) !important;
+        border-top: 1px solid var(--color-border);
+        background: var(--color-surface);
+    }
+
+    .admin-project-modal > footer button,
+    .admin-project-modal > footer a,
+    .admin-project-modal__footer button { width: 100%; min-height: 2.75rem; margin: 0; }
+    .admin-project-modal__footer .admin-danger-button,
+    .admin-project-modal > footer .admin-danger-button { grid-column: 1 / -1; order: 3; }
+    .admin-message-sender { grid-template-columns: 1fr; margin: 1rem; }
+    .admin-message-content { flex: 1; padding: 0 1rem 1rem; overflow-wrap: anywhere; }
+}
+
+@media (max-width: 600px) {
+    .admin-main { padding: .85rem; }
+    .admin-message-filters,
+    .media-library-tools { grid-template-columns: 1fr; }
+
+    .admin-messages-panel { padding: 0; overflow: hidden; }
+    .admin-messages-panel .admin-panel__heading { padding: 1rem 1rem .2rem; }
+    .admin-table-wrapper { overflow: visible; }
+    .admin-messages-table,
+    .admin-messages-table tbody { display: block; width: 100%; }
+    .admin-messages-table thead { display: none; }
+    .admin-messages-table tr {
+        display: grid;
+        gap: .45rem;
+        margin: .75rem;
+        padding: .85rem;
+        border: 1px solid var(--color-border);
+        border-radius: .65rem;
+        background: var(--color-background);
+    }
+    .admin-messages-table tbody tr.is-unread { border-left: 3px solid var(--color-primary); }
+    .admin-messages-table td,
+    .admin-messages-table tbody tr.is-unread td:first-child {
+        display: grid;
+        grid-template-columns: 5.2rem minmax(0, 1fr);
+        gap: .65rem;
+        padding: 0;
+        overflow-wrap: anywhere;
+        border: 0;
+        font-size: .82rem;
+    }
+    .admin-messages-table td::before { color: var(--color-muted); content: attr(data-label); font-size: .7rem; font-weight: 750; text-transform: uppercase; }
+    .admin-message-status { justify-self: start; }
+
+    .admin-technology-section-heading p:last-child { font-size: .82rem; }
+    .admin-technology-category__actions { align-items: stretch; flex-direction: column; }
+    .admin-technology-category__actions > span { margin: 0; }
+    .admin-technology-category__actions button,
+    .admin-technology-item__body button { width: 100%; }
+    .admin-technology-item__body dl div { grid-template-columns: 1fr; gap: .15rem; }
+    .admin-technology-item__body > div { flex-direction: column; }
+}
+
+@media (max-width: 420px) {
+    .admin-main { padding: .7rem; }
+    .admin-stats,
+    .admin-overview__stats,
+    .admin-quick-actions__links,
+    .media-grid { grid-template-columns: 1fr; }
+    .admin-header > button,
+    .admin-filter-toggle,
+    .admin-clear-filters { width: 100%; }
+    .admin-project-modal > footer,
+    .admin-project-modal__footer { grid-template-columns: 1fr; }
+    .admin-project-modal__footer .admin-danger-button,
+    .admin-project-modal > footer .admin-danger-button { grid-column: auto; }
+}
 .admin-related-empty { margin: .75rem 0 0; color: var(--color-muted); }
 .admin-relation-order { display: inline-flex; align-items: center; gap: .4rem; color: var(--color-muted); font-size: .8rem; }
 .admin-related-add select { min-width: 0; width: 100%; }
@@ -801,4 +1069,47 @@
     .admin-project-modal__header { padding-right: 3.75rem; }
     .admin-project-modal__footer { display: grid !important; grid-template-columns: 1fr 1fr; }
     .admin-project-modal__footer .admin-danger-button { grid-column: 1 / -1; order: 3; margin: 0; }
+}
+
+/* Priorité finale des modales mobiles sur les anciens styles. */
+@media (max-width: 800px) {
+    .admin-modal-backdrop { padding: 0; place-items: stretch; overflow: hidden; }
+    .admin-project-modal,
+    .admin-message-modal,
+    .media-edit-modal {
+        display: flex;
+        width: 100%;
+        height: 100dvh;
+        min-height: 0;
+        max-height: 100dvh;
+        flex-direction: column;
+        overflow-y: auto;
+        border: 0;
+        border-radius: 0;
+    }
+    .admin-project-modal > header,
+    .admin-project-modal__header { position: sticky; top: 0; z-index: 3; flex: 0 0 auto; margin: 0; padding: 1rem; background: var(--color-surface); }
+    .admin-project-modal__body { flex: 1 0 auto; padding: 1rem; }
+    .admin-project-form { grid-template-columns: 1fr; gap: 1rem; }
+    .admin-project-modal > footer,
+    .admin-project-modal__footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: .65rem;
+        margin: auto 0 0 !important;
+        padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom)) !important;
+        background: var(--color-surface);
+    }
+    .admin-project-modal__footer .admin-danger-button,
+    .admin-project-modal > footer .admin-danger-button { grid-column: 1 / -1; order: 3; margin: 0; }
+}
+
+@media (max-width: 420px) {
+    .admin-project-modal > footer,
+    .admin-project-modal__footer { grid-template-columns: 1fr; }
+    .admin-project-modal__footer .admin-danger-button,
+    .admin-project-modal > footer .admin-danger-button { grid-column: auto; }
 }

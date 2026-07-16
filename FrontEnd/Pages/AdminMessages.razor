@@ -67,11 +67,11 @@
                                 @foreach (var message in FilteredMessages)
                                 {
                                     <tr class="@(message.IsRead ? null : "is-unread")" @onclick="() => OpenMessage(message)" tabindex="0" @onkeydown="args => HandleRowKey(args, message)">
-                                        <td>@message.SenderName</td>
-                                        <td>@message.SenderEmail</td>
-                                        <td>@message.Subject</td>
-                                        <td><time datetime="@message.ReceivedAt.ToString("O")">@message.ReceivedAt.ToString("dd/MM/yyyy HH:mm")</time></td>
-                                        <td><span class="admin-message-status @(message.IsRead ? "is-read" : null)">@(message.IsRead ? "Lu" : "Non lu")</span></td>
+                                        <td data-label="Expéditeur">@message.SenderName</td>
+                                        <td data-label="E-mail">@message.SenderEmail</td>
+                                        <td data-label="Sujet">@message.Subject</td>
+                                        <td data-label="Reçu le"><time datetime="@message.ReceivedAt.ToString("O")">@message.ReceivedAt.ToString("dd/MM/yyyy HH:mm")</time></td>
+                                        <td data-label="Statut"><span class="admin-message-status @(message.IsRead ? "is-read" : null)">@(message.IsRead ? "Lu" : "Non lu")</span></td>
                                     </tr>
                                 }
                             </tbody>

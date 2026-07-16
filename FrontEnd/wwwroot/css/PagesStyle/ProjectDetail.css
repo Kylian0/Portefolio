@@ -321,6 +321,19 @@
 .document-block .document-media { margin-top: 0; }
 .document-rich-text > :first-child { margin-top: 0; }
 .document-rich-text > :last-child { margin-bottom: 0; }
+
+@media (max-width: 700px) {
+    .project-document-page:has(.wysiwyg-editor) { padding: 0; }
+    .project-document-page:has(.wysiwyg-editor) .project-document { width: 100%; padding: 1rem; border-right: 0; border-left: 0; box-shadow: none; }
+    .project-document__admin-bar { align-items: stretch; flex-direction: column; margin-bottom: 1rem; font-size: .82rem; }
+    .project-document__admin-bar a { width: 100%; text-align: center; }
+    .wysiwyg-editor__title input { font-size: 1rem; }
+    .wysiwyg-editor__page .tox-editor-header { top: 55px !important; padding: .2rem .4rem !important; overflow-x: auto !important; }
+    .wysiwyg-editor__page .tox-toolbar__primary { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: thin; }
+    .wysiwyg-media-actions { padding: .5rem .65rem; }
+    .wysiwyg-editor__footer { align-items: stretch; flex-direction: column; padding: .8rem; }
+    .wysiwyg-editor__footer button { width: 100%; }
+}
 .document-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .document-gallery .document-media { margin: 0; }
 .document-code > span { display: block; margin-bottom: -1.4rem; color: var(--color-muted-light); font-size: 0.78rem; text-transform: uppercase; }
