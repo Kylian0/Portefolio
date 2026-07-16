@@ -1,3 +1,14 @@
+@if (Variant == "compact")
+{
+    <article class="project-card project-card--compact">
+        <a class="project-card__compact-link" href="@DetailUrl" aria-label="Découvrir le projet @Title">
+            <img class="project-card__image" src="@ImageUrl" alt="@ImageAlt" />
+            <h2>@Title</h2>
+        </a>
+    </article>
+}
+else
+{
 <article class="project-card @(Variant == "gallery" ? "project-card--gallery" : null)">
     <div class="project-card__media">
         <img class="project-card__image" src="@ImageUrl" alt="@ImageAlt" />
@@ -58,6 +69,7 @@
         </a>
     </div>
 </article>
+}
 
 @code {
     private const int VisibleTechnologyCount = 3;

@@ -1,4 +1,5 @@
 @page "/"
+@inject IProjectApiService ProjectApiService
 
 <PageTitle>Accueil | Portfolio</PageTitle>
 
@@ -95,16 +96,28 @@
             <a class="text-link" href="/projects">Voir tous les projets →</a>
         </div>
 
-        <div class="featured-projects__grid">
-            <ProjectCard Title="Gestionnaire de tâches"
-                         Description="Une application web pour organiser ses priorités et suivre son avancement."
-                         DetailUrl="/projects/gestionnaire-taches"
-                         ImageAlt="Aperçu temporaire du gestionnaire de tâches" />
-            <ProjectCard Title="Tableau de bord analytique"
-                         Description="Une interface claire pour consulter des indicateurs et comprendre leur évolution."
-                         DetailUrl="/projects/tableau-de-bord"
-                         ImageAlt="Aperçu temporaire du tableau de bord" />
-        </div>
+        @if (isLoadingProjects)
+        {
+            <p role="status">Chargement du projet...</p>
+        }
+        else if (featuredProjects.Count > 0)
+        {
+            <div class="featured-projects__grid">
+                @foreach (var project in featuredProjects)
+                {
+                    <ProjectCard Title="@project.Title"
+                                 Description="@project.ShortDescription"
+                                 DetailUrl="@($"/projects/{project.Slug}")"
+                                 ImageUrl="@(string.IsNullOrWhiteSpace(project.ThumbnailUrl) ? PlaceholderImage : project.ThumbnailUrl)"
+                                 ImageAlt="@($"Aperçu du projet {project.Title}")"
+                                 Variant="compact" />
+                }
+            </div>
+        }
+        else
+        {
+            <p>Aucun projet publié n'est disponible pour le moment.</p>
+        }
     </section>
 
     <section class="home-section approach-section" aria-labelledby="approach-title">
@@ -138,3 +151,29 @@
         </div>
     </section>
 </main>
+
+@code {
+    private const string PlaceholderImage = "images/project-placeholder.svg";
+    private readonly List<ProjectApiDto> featuredProjects = [];
+    private bool isLoadingProjects = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var projects = await ProjectApiService.GetAllAsync();
+            featuredProjects.AddRange(projects
+                .Where(project => string.Equals(project.Status, "published", StringComparison.OrdinalIgnoreCase))
+                .Take(3));
+        }
+        catch
+        {
+            featuredProjects.Clear();
+        }
+        finally
+        {
+            isLoadingProjects = false;
+        }
+    }
+
+}

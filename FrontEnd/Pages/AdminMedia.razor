@@ -44,7 +44,7 @@
     @if (IsImage(editing) && ResolveMediaUrl(editing) is { } preview) { <img class="media-edit-preview" src="@preview" alt="@(editing.AltText ?? editing.OriginalFilename)" /> }
     <div class="admin-project-form"><label>Texte alternatif<input maxlength="500" @bind="editing.AltText" /></label><label>Légende<textarea maxlength="500" @bind="editing.Caption"></textarea></label><label>Projet associé<select @bind="editing.ProjectId"><option value="">Aucun projet</option>@foreach (var project in projects.OrderBy(x => x.Title)) { <option value="@project.Id">@project.Title</option> }</select></label></div>
     @if (!string.IsNullOrWhiteSpace(modalError)) { <p class="admin-modal-message is-error" role="alert">@modalError</p> }
-    <footer><button type="button" disabled="@saving" @onclick="CopyUrlAsync">Copier l’URL</button>@if (ResolveMediaUrl(editing) is { } download) { <a class="admin-secondary-button" href="@download" target="_blank" download="@editing.OriginalFilename">Télécharger</a> }<button class="documentation-editor__danger" disabled="@saving" @onclick="DeleteAsync">Supprimer</button><button class="admin-primary-button" disabled="@saving" @onclick="SaveAsync">@(saving ? "Enregistrement…" : "Enregistrer")</button></footer>
+    <footer><button type="button" disabled="@saving" @onclick="CopyUrlAsync">Copier l’URL</button>@if (ResolveMediaUrl(editing) is { } download) { <a class="admin-secondary-button" href="@download" target="_blank" download="@editing.OriginalFilename">Télécharger</a> }<button class="admin-danger-button" disabled="@saving" @onclick="DeleteAsync">Supprimer</button><button class="admin-primary-button" disabled="@saving" @onclick="SaveAsync">@(saving ? "Enregistrement…" : "Enregistrer")</button></footer>
 </section></div>
 }
 
