@@ -50,3 +50,15 @@ Dans le réseau Docker, MySQL est accessible avec le nom d'hôte `mysql` et le p
 ## Hot Reload
 
 Les dossiers `../FrontEnd` et `../BackEnd` sont montés directement dans les conteneurs. Les volumes séparés pour `bin` et `obj` évitent de mélanger les artefacts Linux des conteneurs avec ceux de la machine hôte. Les modifications de sources sont détectées par `dotnet watch` en mode polling.
+
+## Content Security Policy en production
+
+La CSP n'est pas activée directement dans le `Caddyfile`. Blazor WebAssembly, TinyMCE, les styles injectés par l'éditeur, les aperçus de médias et les vidéos YouTube/Vimeo doivent d'abord être validés en conditions réelles.
+
+La politique suivante constitue une base à tester en mode rapport :
+
+```caddyfile
+header @frontend Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com"
+```
+
+Pour la tester, ajoutez temporairement cette ligne dans le bloc du domaine, rechargez Caddy, puis parcourez toutes les pages publiques et administratives en surveillant les violations CSP dans la console du navigateur. Il faut notamment tester le démarrage Blazor, la connexion, TinyMCE, l'upload et l'insertion d'images/vidéos, la galerie et les vidéos intégrées. N'utilisez `Content-Security-Policy` qu'après avoir supprimé ou justifié toutes les violations observées.
