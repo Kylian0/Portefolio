@@ -38,6 +38,8 @@ services:
       MediaStorage__RootPath: /workspace/BackEnd/uploads
       MediaStorage__PublicPath: /uploads
       MediaStorage__MaxFileSizeBytes: "${MEDIA_MAX_FILE_SIZE_BYTES:-26214400}"
+      MediaStorage__MaxRequestSizeBytes: "${MEDIA_MAX_REQUEST_SIZE_BYTES:-104857600}"
+      MediaStorage__MaxFilesPerUpload: "${MEDIA_MAX_FILES_PER_UPLOAD:-20}"
       AdminBootstrap__Username: "${ADMIN_USERNAME:-}"
       AdminBootstrap__Password: "${ADMIN_PASSWORD:-}"
     ports:

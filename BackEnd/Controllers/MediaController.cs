@@ -2,6 +2,7 @@ using BackEnd.Dtos;
 using BackEnd.Exceptions;
 using BackEnd.Models;
 using BackEnd.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BackEnd.Controllers;
@@ -75,10 +76,13 @@ public sealed class MediaController(Media mediaModel, Project projectModel, Medi
     }
 
     [HttpPost("upload")]
+    [Authorize]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<IReadOnlyList<MediaDto>>> Upload([FromForm] List<IFormFile> files, [FromForm] uint? projectId, CancellationToken cancellationToken)
     {
         if (files.Count == 0) return Problem(statusCode: 400, title: "No files supplied", detail: "Sélectionnez au moins un fichier.");
+        if (files.Count > storage.MaxFilesPerUpload) return Problem(statusCode: 400, title: "Too many files", detail: $"Un envoi ne peut pas contenir plus de {storage.MaxFilesPerUpload} fichiers.");
+        if (files.Sum(file => file.Length) > storage.MaxRequestSizeBytes) return Problem(statusCode: 413, title: "Upload too large", detail: $"La taille totale de l'envoi ne peut pas dépasser {storage.MaxRequestSizeBytes} octets.");
         if (projectId.HasValue && await projectModel.GetByIdAsync(projectId.Value, cancellationToken) is null) return ProjectNotFound(projectId.Value);
         var created = new List<Media>();
         try

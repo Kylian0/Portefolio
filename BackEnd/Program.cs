@@ -7,12 +7,15 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+var maxMediaRequestSize = builder.Configuration.GetValue<long>("MediaStorage:MaxRequestSizeBytes", 104_857_600);
 
 // Add services to the container.
 
 builder.Services.AddControllers(options => options.Filters.Add<AdminWriteAuthorizationFilter>());
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = maxMediaRequestSize);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = IdentityConstants.BearerScheme;
@@ -115,9 +118,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path.Equals("/api/media/upload"))
+    {
+        var requestSizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (requestSizeFeature is { IsReadOnly: false }) requestSizeFeature.MaxRequestBodySize = maxMediaRequestSize;
+    }
+
+    await next(context);
+});
 app.UseRouting();
 app.UseCors("FrontEnd");
-app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(mediaRoot), RequestPath = "/" + mediaOptions.PublicPath.Trim('/') });
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(mediaRoot),
+    RequestPath = "/" + mediaOptions.PublicPath.Trim('/'),
+    OnPrepareResponse = context => context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

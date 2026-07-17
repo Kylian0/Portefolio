@@ -19,6 +19,8 @@ public sealed class MediaFileStorageService(IWebHostEnvironment environment, IOp
         ? options.Value.RootPath : Path.Combine(environment.ContentRootPath, options.Value.RootPath));
     public string PublicPath => "/" + options.Value.PublicPath.Trim('/');
     public long MaxFileSizeBytes => options.Value.MaxFileSizeBytes;
+    public long MaxRequestSizeBytes => options.Value.MaxRequestSizeBytes;
+    public int MaxFilesPerUpload => options.Value.MaxFilesPerUpload;
 
     public async Task<StoredMediaFile> SaveAsync(IFormFile file, CancellationToken cancellationToken)
     {
@@ -26,7 +28,8 @@ public sealed class MediaFileStorageService(IWebHostEnvironment environment, IOp
         if (file.Length > MaxFileSizeBytes) throw new InvalidDataException($"Le fichier dépasse la limite de {MaxFileSizeBytes} octets.");
         if (!Allowed.TryGetValue(file.ContentType, out var allowed)) throw new InvalidDataException("Le type MIME du fichier n'est pas autorisé.");
 
-        var extension = Path.GetExtension(Path.GetFileName(file.FileName)).ToLowerInvariant();
+        var submittedFilename = Path.GetFileName(file.FileName.Replace('\\', '/'));
+        var extension = Path.GetExtension(submittedFilename).ToLowerInvariant();
         if (!allowed.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) throw new InvalidDataException("L'extension ne correspond pas au type MIME déclaré.");
         await using (var input = file.OpenReadStream())
         {
@@ -38,11 +41,19 @@ public sealed class MediaFileStorageService(IWebHostEnvironment environment, IOp
         Directory.CreateDirectory(RootPath);
         var storedFilename = $"{Guid.NewGuid():N}{extension}";
         var destination = Path.Combine(RootPath, storedFilename);
-        await using (var input = file.OpenReadStream())
-        await using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+        try
+        {
+            await using var input = file.OpenReadStream();
+            await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
             await input.CopyToAsync(output, cancellationToken);
+        }
+        catch
+        {
+            if (File.Exists(destination)) File.Delete(destination);
+            throw;
+        }
 
-        return new(allowed.Type, Path.GetFileName(file.FileName), storedFilename,
+        return new(allowed.Type, NormalizeOriginalFilename(submittedFilename, extension), storedFilename,
             Path.GetRelativePath(environment.ContentRootPath, destination).Replace('\\', '/'),
             $"{PublicPath}/{storedFilename}", file.ContentType, checked((ulong)file.Length));
     }
@@ -68,4 +79,11 @@ public sealed class MediaFileStorageService(IWebHostEnvironment environment, IOp
     };
 
     private static bool Starts(byte[] source, params byte[] expected) => source.Length >= expected.Length && expected.SequenceEqual(source.Take(expected.Length));
+
+    private static string NormalizeOriginalFilename(string filename, string extension)
+    {
+        var normalized = new string(filename.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(normalized)) normalized = $"media{extension}";
+        return normalized.Length <= 255 ? normalized : normalized[..255];
+    }
 }
