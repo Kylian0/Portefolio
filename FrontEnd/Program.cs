@@ -9,9 +9,12 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"]
     ?? throw new InvalidOperationException("Api:BaseUrl is not configured.");
-var apiBaseAddress = Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var absoluteApiBaseAddress)
-    ? absoluteApiBaseAddress
-    : new Uri(new Uri(builder.HostEnvironment.BaseAddress), apiBaseUrl);
+var apiBaseAddress =
+    Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var absoluteApiBaseAddress) &&
+    (absoluteApiBaseAddress.Scheme == Uri.UriSchemeHttp ||
+     absoluteApiBaseAddress.Scheme == Uri.UriSchemeHttps)
+        ? absoluteApiBaseAddress
+        : new Uri(new Uri(builder.HostEnvironment.BaseAddress), apiBaseUrl);
 
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = apiBaseAddress });
 builder.Services.AddScoped<IProjectApiService, ProjectApiService>();
