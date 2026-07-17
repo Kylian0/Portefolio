@@ -8,10 +8,14 @@ public sealed class MediaApiService(HttpClient httpClient) : IMediaApiService
 {
     private const long MaxUploadSize = 26_214_400;
     public async Task<IReadOnlyList<MediaApiDto>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        await httpClient.GetFromJsonAsync<MediaApiDto[]>("api/media", cancellationToken) ?? [];
+        (await httpClient.GetFromJsonAsync<MediaApiDto[]>("api/media", cancellationToken) ?? [])
+        .Select(NormalizePublicUrl)
+        .ToArray();
 
     public async Task<IReadOnlyList<MediaApiDto>> GetByProjectIdAsync(uint projectId, CancellationToken cancellationToken = default) =>
-        await httpClient.GetFromJsonAsync<MediaApiDto[]>($"api/projects/{projectId}/media", cancellationToken) ?? [];
+        (await httpClient.GetFromJsonAsync<MediaApiDto[]>($"api/projects/{projectId}/media", cancellationToken) ?? [])
+        .Select(NormalizePublicUrl)
+        .ToArray();
 
     public async Task<MediaApiDto> UploadAsync(IBrowserFile file, uint? projectId, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
@@ -24,16 +28,18 @@ public sealed class MediaApiService(HttpClient httpClient) : IMediaApiService
         if (projectId.HasValue) form.Add(new StringContent(projectId.Value.ToString()), "projectId");
         using var response = await httpClient.PostAsync("api/media/upload", form, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
-        return (await response.Content.ReadFromJsonAsync<MediaApiDto[]>(cancellationToken: cancellationToken))?.Single()
+        var media = (await response.Content.ReadFromJsonAsync<MediaApiDto[]>(cancellationToken: cancellationToken))?.Single()
             ?? throw new InvalidOperationException("La réponse d'upload est vide.");
+        return NormalizePublicUrl(media);
     }
 
     public async Task<MediaApiDto> UpdateAsync(uint id, MediaApiDto media, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.PutAsJsonAsync($"api/media/{id}", media, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<MediaApiDto>(cancellationToken: cancellationToken)
+        var updatedMedia = await response.Content.ReadFromJsonAsync<MediaApiDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("La réponse de mise à jour est vide.");
+        return NormalizePublicUrl(updatedMedia);
     }
 
     public async Task DeleteAsync(uint id, CancellationToken cancellationToken = default)
@@ -48,6 +54,28 @@ public sealed class MediaApiService(HttpClient httpClient) : IMediaApiService
         var problem = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: cancellationToken);
         var detail = problem.TryGetProperty("detail", out var value) ? value.GetString() : null;
         throw new InvalidOperationException(detail ?? $"L'API a retourné {(int)response.StatusCode}.");
+    }
+
+    private MediaApiDto NormalizePublicUrl(MediaApiDto media)
+    {
+        if (string.IsNullOrWhiteSpace(media.PublicUrl)) return media;
+
+        var publicUrl = media.PublicUrl.Trim();
+        if (Uri.TryCreate(publicUrl, UriKind.Absolute, out var absoluteUrl))
+        {
+            media.PublicUrl = absoluteUrl.Scheme is "http" or "https" ? absoluteUrl.ToString() : null;
+            return media;
+        }
+
+        if (httpClient.BaseAddress is { Scheme: "http" or "https" } baseAddress &&
+            Uri.TryCreate(publicUrl, UriKind.Relative, out var relativeUrl))
+        {
+            media.PublicUrl = new Uri(baseAddress, relativeUrl).ToString();
+            return media;
+        }
+
+        media.PublicUrl = null;
+        return media;
     }
 
     private sealed class ProgressReadStream(Stream inner, long length, IProgress<int>? progress) : Stream

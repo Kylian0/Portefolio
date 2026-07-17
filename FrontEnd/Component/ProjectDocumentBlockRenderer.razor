@@ -279,7 +279,9 @@
         }
 
         var baseUrl = Configuration["Api:BaseUrl"];
-        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var apiBase) ? new Uri(apiBase, value).ToString() : null;
+        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var apiBase) && apiBase.Scheme is "http" or "https"
+            ? new Uri(apiBase, value).ToString()
+            : value;
     }
 
     private string BuildTextStyle()

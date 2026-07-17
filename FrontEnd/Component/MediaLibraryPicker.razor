@@ -177,12 +177,14 @@
         if (string.IsNullOrWhiteSpace(value)) return null;
         value = value.Trim().Replace('\\', '/');
         if (Uri.TryCreate(value, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https") return absolute.ToString();
-        if (!Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root)) return null;
         var publicPath = value.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase)
             ? "/" + value.TrimStart('/')
             : null;
-        return publicPath is null ? null : new Uri(root, publicPath).ToString();
+        if (publicPath is null) return null;
+        return Uri.TryCreate(Configuration["Api:BaseUrl"], UriKind.Absolute, out var root) && root.Scheme is "http" or "https"
+            ? new Uri(root, publicPath).ToString()
+            : publicPath;
     }
 
     private static string FormatFileSize(ulong bytes) => bytes switch
