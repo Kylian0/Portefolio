@@ -38,7 +38,9 @@ ScaffoldingReadMe.txt
 
 # dotenv environment variables file
 .env
-.env.production
+.env.*
+!.env.example
+!.env.production.example
 
 # Others
 ~$*
