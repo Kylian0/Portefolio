@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BackEnd.Controllers;
 
@@ -13,6 +14,7 @@ public sealed class AuthController(UserManager<AdminUser> userManager, SignInMan
 {
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("admin-login")]
     public async Task<IActionResult> Login(AdminLoginDto request)
     {
         var user = await userManager.FindByNameAsync(request.Username.Trim());

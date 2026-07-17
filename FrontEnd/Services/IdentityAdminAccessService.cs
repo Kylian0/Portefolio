@@ -9,14 +9,12 @@ public sealed class IdentityAdminAccessService(HttpClient httpClient, IJSRuntime
 {
     private const string TokenKey = "portfolio.admin.accessToken";
     private const string ExpiryKey = "portfolio.admin.expiresAt";
-    private bool initialized;
     public bool IsAuthenticated { get; private set; }
 
     public async Task InitializeAsync()
     {
-        if (initialized) return; initialized = true;
-        var token = await js.InvokeAsync<string?>("localStorage.getItem", TokenKey);
-        var expiryValue = await js.InvokeAsync<string?>("localStorage.getItem", ExpiryKey);
+        var token = await js.InvokeAsync<string?>("sessionStorage.getItem", TokenKey);
+        var expiryValue = await js.InvokeAsync<string?>("sessionStorage.getItem", ExpiryKey);
         if (string.IsNullOrWhiteSpace(token) || !DateTimeOffset.TryParse(expiryValue, out var expiry) || expiry <= DateTimeOffset.UtcNow) { await ClearAsync(); return; }
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         try { using var response = await httpClient.GetAsync("api/auth/me"); IsAuthenticated = response.IsSuccessStatusCode; if (!IsAuthenticated) await ClearAsync(); }
@@ -30,10 +28,10 @@ public sealed class IdentityAdminAccessService(HttpClient httpClient, IJSRuntime
         var token = await response.Content.ReadFromJsonAsync<TokenResponse>();
         if (token is null || string.IsNullOrWhiteSpace(token.AccessToken)) return false;
         var expiry = DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn);
-        await js.InvokeVoidAsync("localStorage.setItem", TokenKey, token.AccessToken);
-        await js.InvokeVoidAsync("localStorage.setItem", ExpiryKey, expiry.ToString("O"));
+        await js.InvokeVoidAsync("sessionStorage.setItem", TokenKey, token.AccessToken);
+        await js.InvokeVoidAsync("sessionStorage.setItem", ExpiryKey, expiry.ToString("O"));
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
-        initialized = IsAuthenticated = true;
+        IsAuthenticated = true;
         return true;
     }
 
@@ -42,6 +40,7 @@ public sealed class IdentityAdminAccessService(HttpClient httpClient, IJSRuntime
     private async ValueTask ClearAsync()
     {
         IsAuthenticated = false; httpClient.DefaultRequestHeaders.Authorization = null;
+        await js.InvokeVoidAsync("sessionStorage.removeItem", TokenKey); await js.InvokeVoidAsync("sessionStorage.removeItem", ExpiryKey);
         await js.InvokeVoidAsync("localStorage.removeItem", TokenKey); await js.InvokeVoidAsync("localStorage.removeItem", ExpiryKey);
     }
 
