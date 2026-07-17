@@ -61,26 +61,26 @@
                 <div class="contact-form-row">
                     <div class="form-field">
                         <label for="contact-name">Nom</label>
-                        <InputText id="contact-name" @bind-Value="contactForm.Name" autocomplete="name" placeholder="Votre nom" />
+                        <InputText id="contact-name" @bind-Value="contactForm.Name" autocomplete="name" maxlength="80" placeholder="Votre nom" />
                         <ValidationMessage For="@(() => contactForm.Name)" />
                     </div>
 
                     <div class="form-field">
                         <label for="contact-email">E-mail</label>
-                        <InputText id="contact-email" @bind-Value="contactForm.Email" type="email" autocomplete="email" placeholder="vous@exemple.fr" />
+                        <InputText id="contact-email" @bind-Value="contactForm.Email" type="email" autocomplete="email" maxlength="254" placeholder="vous@exemple.fr" />
                         <ValidationMessage For="@(() => contactForm.Email)" />
                     </div>
                 </div>
 
                 <div class="form-field">
                     <label for="contact-subject">Sujet</label>
-                    <InputText id="contact-subject" @bind-Value="contactForm.Subject" placeholder="De quoi souhaitez-vous parler ?" />
+                    <InputText id="contact-subject" @bind-Value="contactForm.Subject" maxlength="120" placeholder="De quoi souhaitez-vous parler ?" />
                     <ValidationMessage For="@(() => contactForm.Subject)" />
                 </div>
 
                 <div class="form-field">
                     <label for="contact-message">Message</label>
-                    <InputTextArea id="contact-message" @bind-Value="contactForm.Message" rows="7" placeholder="Écrivez votre message ici…" />
+                    <InputTextArea id="contact-message" @bind-Value="contactForm.Message" rows="7" maxlength="2000" placeholder="Écrivez votre message ici…" />
                     <ValidationMessage For="@(() => contactForm.Message)" />
                 </div>
 
@@ -113,6 +113,7 @@
 
         [Required(ErrorMessage = "L'adresse e-mail est obligatoire.")]
         [EmailAddress(ErrorMessage = "Saisissez une adresse e-mail valide.")]
+        [StringLength(254, ErrorMessage = "L'adresse e-mail ne peut pas dépasser 254 caractères.")]
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Le sujet est obligatoire.")]
