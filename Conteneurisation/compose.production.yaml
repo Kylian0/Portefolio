@@ -1,0 +1,87 @@
+name: portfolio-production
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: Conteneurisation/Dockerfile.frontend.production
+    restart: unless-stopped
+    networks:
+      - portfolio_internal
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Conteneurisation/Dockerfile.backend.production
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__PortfolioDatabase: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:?Définissez MYSQL_DATABASE};User ID=${MYSQL_USER:?Définissez MYSQL_USER};Password=${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD}"
+      MediaStorage__RootPath: /app/uploads
+      MediaStorage__PublicPath: /uploads
+      MediaStorage__MaxFileSizeBytes: "${MEDIA_MAX_FILE_SIZE_BYTES:-26214400}"
+      AdminBootstrap__Username: "${ADMIN_USERNAME:?Définissez ADMIN_USERNAME}"
+      AdminBootstrap__Password: "${ADMIN_PASSWORD:?Définissez ADMIN_PASSWORD}"
+    volumes:
+      - media_uploads:/app/uploads
+      - identity_keys:/home/app/.aspnet/DataProtection-Keys
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - portfolio_internal
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Définissez MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:?Définissez MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER:?Définissez MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Définissez MYSQL_PASSWORD}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - portfolio_internal
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      DOMAIN: "${DOMAIN:-portfolio-garnier.fr}"
+      CADDY_EMAIL: "${CADDY_EMAIL:?Définissez CADDY_EMAIL}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - portfolio_public
+      - portfolio_internal
+
+volumes:
+  mysql_data:
+  media_uploads:
+  identity_keys:
+  caddy_data:
+  caddy_config:
+
+networks:
+  portfolio_public:
+  portfolio_internal:
+    internal: true
+

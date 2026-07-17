@@ -1,0 +1,16 @@
+{
+    email {$CADDY_EMAIL}
+}
+
+{$DOMAIN:portfolio-garnier.fr} {
+    encode zstd gzip
+
+    @api path /api/*
+    reverse_proxy @api backend:8080
+
+    @uploads path /uploads/*
+    reverse_proxy @uploads backend:8080
+
+    reverse_proxy frontend:80
+}
+

@@ -1,0 +1,29 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+COPY BackEnd/BackEnd.csproj BackEnd/
+RUN dotnet restore BackEnd/BackEnd.csproj
+
+COPY BackEnd/ BackEnd/
+RUN dotnet publish BackEnd/BackEnd.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /app/publish \
+    /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+
+WORKDIR /app
+
+COPY --from=build /app/publish .
+RUN mkdir -p /app/uploads /home/app/.aspnet/DataProtection-Keys \
+    && chown -R app:app /app /home/app/.aspnet
+
+USER app
+
+ENV ASPNETCORE_HTTP_PORTS=8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "BackEnd.dll"]
+
