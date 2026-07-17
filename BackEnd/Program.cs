@@ -61,18 +61,27 @@ builder.Services.Configure<PasswordHasherOptions>(options =>
 builder.Services.AddScoped<IUserStore<AdminUser>, MySqlAdminUserStore>();
 builder.Services.AddSingleton<AdminIdentityInitializer>();
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-builder.Services.AddCors(options =>
+if (allowedOrigins.Length > 0)
 {
-    options.AddPolicy("FrontEnd", policy =>
+    if (allowedOrigins.Any(origin =>
+            origin == "*" ||
+            !Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)))
     {
-        if (allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins);
-        }
+        throw new InvalidOperationException(
+            "Chaque origine CORS doit être une URL HTTP(S) absolue. L'origine générique '*' n'est pas autorisée.");
+    }
 
-        policy.AllowAnyHeader().AllowAnyMethod();
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("FrontEnd", policy =>
+        {
+            policy.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
     });
-});
+}
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen(options =>
@@ -137,7 +146,10 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.UseRouting();
-app.UseCors("FrontEnd");
+if (allowedOrigins.Length > 0)
+{
+    app.UseCors("FrontEnd");
+}
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(mediaRoot),
